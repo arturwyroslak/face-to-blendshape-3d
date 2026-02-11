@@ -54,9 +54,9 @@ export class FaceMeshGenerator {
         
         // 1.15 makes the face narrower
         const correctedScaleX = scaleX * 1.15;  
-        // Fix depth flattening: 0.6 factor (was 1.8). 
-        // Smaller divisor = larger Z values = more depth.
-        const scaleZ = Math.max(scaleX, scaleY) * 0.6; 
+        // Fix depth: 0.6 was too extreme, causing self-shadowing/artifacts.
+        // 1.2 is a good balance for depth without distortion.
+        const scaleZ = Math.max(scaleX, scaleY) * 1.2; 
         
         // Calculate texture crop bounds
         const padding = 0.2;
@@ -107,6 +107,7 @@ export class FaceMeshGenerator {
         }
         
         this.geometry.setIndex(indices);
+        // Important: Compute normals AFTER setting index and positions
         this.geometry.computeVertexNormals();
         
         // Morph targets
@@ -122,10 +123,12 @@ export class FaceMeshGenerator {
         // Material
         this.material = new THREE.MeshStandardMaterial({
             map: texture,
-            vertexColors: true,
-            roughness: 0.5, // Smoother skin
+            vertexColors: false, // Use texture color only
+            roughness: 0.5,
             metalness: 0.0,
-            side: THREE.DoubleSide, // Ensure visibility from all angles
+            emissive: new THREE.Color(0x222222), // Add slight emission to prevent total blackness
+            emissiveIntensity: 0.2,
+            side: THREE.DoubleSide, 
             transparent: true, 
             alphaTest: 0.1     
         });
