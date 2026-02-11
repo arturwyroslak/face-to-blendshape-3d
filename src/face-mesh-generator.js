@@ -45,13 +45,11 @@ export class FaceMeshGenerator {
         const centerY = (minY + maxY) / 2;
         const centerZ = (minZ + maxZ) / 2;
         
-        // Independent X/Y scaling to preserve face aspect ratio
+        // Use scaleY (height) as uniform scale for X and Y to preserve aspect ratio
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
-        // Z uses a fixed normalization factor (MediaPipe Z is in different scale)
-        // Similar to spite's approach: -p[2] / 500
-        // MediaPipe normalizedLandmarks Z is roughly in range [-0.5, 0.5] relative to image width
-        const scaleZ = Math.max(scaleX, scaleY);  // Match X/Y scale for proper depth ratio
+        const uniformScale = scaleY;  // Base everything on height
+        const scaleZ = Math.max(scaleX, scaleY);  // Z uses max(X,Y) for proper depth
         
         // Calculate texture crop bounds (same as TextureMapper)
         const padding = 0.2;
@@ -66,7 +64,7 @@ export class FaceMeshGenerator {
         // Sample skin color
         const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
         
-        // Generate complete head
+        // Generate complete head with uniform scaling
         const headData = this.headGenerator.generateCompleteHead(
             landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
         );
@@ -119,8 +117,8 @@ export class FaceMeshGenerator {
         this.geometry.setIndex(indices);
         this.geometry.computeVertexNormals();
         
-        // Morph targets
-        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, headData.vertices.length / 3);
+        // Morph targets with uniform scaling
+        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, uniformScale, uniformScale, scaleZ, headData.vertices.length / 3);
         
         // Texture
         const texture = new THREE.CanvasTexture(textureCanvas);
@@ -215,6 +213,7 @@ export class FaceMeshGenerator {
         const multiplier = 0.1;
         
         landmarks.forEach((landmark, index) => {
+            // Use uniform scaling (scaleX and scaleY are now the same = uniformScale)
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
             let z = -((landmark.z - centerZ) / scaleZ * 2);
