@@ -253,6 +253,7 @@ class FaceToBlendshape3D {
                 const headBox = new THREE.Box3().setFromObject(this.headModel);
                 const headWidth = headBox.max.x - headBox.min.x;
                 const headHeight = headBox.max.y - headBox.min.y;
+                const headDepth = headBox.max.z - headBox.min.z;
                 // Get Center of Head Model for alignment
                 const headCenter = headBox.getCenter(new THREE.Vector3());
 
@@ -280,13 +281,23 @@ class FaceToBlendshape3D {
                 
                 // 4. Apply Skin Color
                 const skinColor = this.faceMesh.userData.skinColor;
+                console.log('Applying Skin Color:', skinColor);
+                
                 if (skinColor) {
                     this.headModel.traverse((child) => {
                         if (child.isMesh) {
                             // Clone material to avoid sharing if multiple objects
                             child.material = child.material.clone();
-                            child.material.color.setRGB(skinColor.r, skinColor.g, skinColor.b);
+                            
+                            // Ensure color is bright enough (simple tone mapping)
+                            const r = Math.max(skinColor.r, 0.5);
+                            const g = Math.max(skinColor.g, 0.4);
+                            const b = Math.max(skinColor.b, 0.3);
+                            
+                            child.material.color.setRGB(r, g, b);
                             child.material.map = null; // Remove existing texture
+                            child.material.roughness = 0.8; // Skin-like roughness
+                            child.material.metalness = 0.0;
                             child.material.needsUpdate = true;
                             // Ensure double sided or front sided visibility
                             child.material.side = THREE.DoubleSide; 
@@ -298,19 +309,27 @@ class FaceToBlendshape3D {
                 // Re-measure after scaling
                 const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
                 const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
+                const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
                 
                 // Align centers X/Y
                 const offsetX = faceCenter.x - scaledHeadCenter.x;
                 const offsetY = faceCenter.y - scaledHeadCenter.y;
                 
                 // Align Z:
-                // Move head center to face center, then push back
-                // Head MaxZ should be near Face MinZ
-                // Let's rely on Box3 centers for safety
-                // Current Head Z Center needs to move to Face Z Center, then Offset
-                const offsetZ = faceCenter.z - scaledHeadCenter.z + 0.5; // Push forward/back relative
-                // Or better: align Back of Face to Front of Head
-                // const zShift = (faceBox.min.z - scaledHeadBox.max.z) + 0.2;
+                // Move head center to face center
+                // THEN push BACK by roughly half the head depth + a bit more
+                // Because Head Center is in the middle of the skull, and Face Center is on the surface.
+                // We want the front surface of head to match back surface of face.
+                
+                // Center alignment first:
+                let targetZ = faceCenter.z - scaledHeadCenter.z;
+                
+                // Now push back. Head center is at 0 (relative). Front is at +Depth/2.
+                // We want Front (+Depth/2) to be at Face Z.
+                // So move center back by Depth/2.
+                const pushBack = scaledHeadDepth * 0.4; // 40% of depth back
+                
+                const offsetZ = targetZ - pushBack;
                 
                 this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
                 
