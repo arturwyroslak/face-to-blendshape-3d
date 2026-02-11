@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { ARKitBlendshapeMapper } from './arkit-mapper.js';
 import { FaceMeshGenerator } from './face-mesh-generator.js';
+import { TextureMapper } from './texture-mapper.js';
 
 class FaceToBlendshape3D {
     constructor() {
@@ -14,6 +16,7 @@ class FaceToBlendshape3D {
         this.faceMesh = null;
         this.blendshapes = {};
         this.currentImage = null;
+        this.textureCanvas = null;
         
         this.init();
     }
@@ -67,7 +70,7 @@ class FaceToBlendshape3D {
         this.camera.position.z = 2;
         
         // Renderer
-        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
         this.renderer.setSize(container.clientWidth, container.clientHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
         
@@ -83,6 +86,10 @@ class FaceToBlendshape3D {
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(0, 1, 1);
         this.scene.add(directionalLight);
+        
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        backLight.position.set(0, 0, -1);
+        this.scene.add(backLight);
         
         // Handle resize
         window.addEventListener('resize', () => this.onResize());
@@ -122,7 +129,7 @@ class FaceToBlendshape3D {
         });
         
         processBtn.addEventListener('click', () => this.processImage());
-        exportBtn.addEventListener('click', () => this.exportModel());
+        exportBtn.addEventListener('click', () => this.exportGLB());
     }
     
     loadImage(file) {
@@ -166,10 +173,20 @@ class FaceToBlendshape3D {
             const mapper = new ARKitBlendshapeMapper();
             this.blendshapes = mapper.mapMediaPipeToARKit(blendshapes, landmarks);
             
-            // Generate 3D mesh
-            this.showStatus('Generating 3D model...', 'loading');
+            // Generate texture from image
+            this.showStatus('Generating face texture...', 'loading');
+            const textureMapper = new TextureMapper();
+            this.textureCanvas = textureMapper.createFaceTexture(this.currentImage, landmarks);
+            
+            // Generate 3D mesh with morph targets
+            this.showStatus('Generating 3D model with morph targets...', 'loading');
             const meshGenerator = new FaceMeshGenerator();
-            this.faceMesh = meshGenerator.generate(landmarks, this.blendshapes, transformMatrix);
+            this.faceMesh = meshGenerator.generateWithMorphTargets(
+                landmarks,
+                this.blendshapes,
+                transformMatrix,
+                this.textureCanvas
+            );
             
             // Clear previous mesh
             const oldMesh = this.scene.getObjectByName('faceMesh');
@@ -185,7 +202,7 @@ class FaceToBlendshape3D {
             this.displayBlendshapes();
             
             document.getElementById('exportBtn').disabled = false;
-            this.showStatus('3D model generated successfully!', 'success');
+            this.showStatus('3D model with texture and morph targets generated!', 'success');
         } catch (error) {
             console.error('Processing error:', error);
             this.showStatus('Error: ' + error.message, 'error');
@@ -201,82 +218,70 @@ class FaceToBlendshape3D {
         
         list.innerHTML = '';
         
-        Object.entries(this.blendshapes).forEach(([name, value]) => {
-            const item = document.createElement('div');
-            item.className = 'blendshape-item';
-            item.innerHTML = `
-                <span class="blendshape-name">${name}</span>
-                <span class="blendshape-value">${(value * 100).toFixed(1)}%</span>
-            `;
-            list.appendChild(item);
-        });
+        Object.entries(this.blendshapes)
+            .filter(([name, value]) => value > 0.01)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([name, value]) => {
+                const item = document.createElement('div');
+                item.className = 'blendshape-item';
+                item.innerHTML = `
+                    <span class="blendshape-name">${name}</span>
+                    <span class="blendshape-value">${(value * 100).toFixed(1)}%</span>
+                `;
+                list.appendChild(item);
+            });
         
         panel.style.display = 'block';
     }
     
-    exportModel() {
+    async exportGLB() {
         if (!this.faceMesh) return;
         
         try {
-            const exporter = {
-                parse: () => {
-                    const data = {
-                        metadata: {
-                            generator: 'Face-to-Blendshape-3D',
-                            version: '1.0.0',
-                            timestamp: new Date().toISOString()
-                        },
-                        geometry: {
-                            vertices: [],
-                            faces: [],
-                            uvs: []
-                        },
-                        blendshapes: this.blendshapes
-                    };
-                    
-                    // Extract geometry
-                    const geometry = this.faceMesh.geometry;
-                    const positions = geometry.attributes.position;
-                    
-                    for (let i = 0; i < positions.count; i++) {
-                        data.geometry.vertices.push([
-                            positions.getX(i),
-                            positions.getY(i),
-                            positions.getZ(i)
-                        ]);
-                    }
-                    
-                    if (geometry.index) {
-                        const indices = geometry.index;
-                        for (let i = 0; i < indices.count; i += 3) {
-                            data.geometry.faces.push([
-                                indices.getX(i),
-                                indices.getX(i + 1),
-                                indices.getX(i + 2)
-                            ]);
-                        }
-                    }
-                    
-                    return JSON.stringify(data, null, 2);
-                }
+            document.getElementById('exportBtn').disabled = true;
+            this.showStatus('Exporting GLB with texture and morph targets...', 'loading');
+            
+            const exporter = new GLTFExporter();
+            
+            // Export options
+            const options = {
+                binary: true,
+                maxTextureSize: 2048,
+                embedImages: true,
+                truncateDrawRange: false
             };
             
-            const result = exporter.parse();
-            const blob = new Blob([result], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'face-model-blendshapes.json';
-            link.click();
-            
-            URL.revokeObjectURL(url);
-            
-            this.showStatus('Model exported successfully!', 'success');
+            // Export to GLB
+            exporter.parse(
+                this.faceMesh,
+                (result) => {
+                    if (result instanceof ArrayBuffer) {
+                        this.saveArrayBuffer(result, 'face-model-blendshapes.glb');
+                        this.showStatus('GLB model exported successfully!', 'success');
+                    }
+                },
+                (error) => {
+                    console.error('Export error:', error);
+                    this.showStatus('Export failed: ' + error.message, 'error');
+                },
+                options
+            );
         } catch (error) {
             console.error('Export error:', error);
             this.showStatus('Export failed: ' + error.message, 'error');
+        } finally {
+            document.getElementById('exportBtn').disabled = false;
         }
+    }
+    
+    saveArrayBuffer(buffer, filename) {
+        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
     }
     
     showStatus(message, type) {

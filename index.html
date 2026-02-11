@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face to Blendshape 3D</title>
+    <title>Face to Blendshape 3D - GLB Export</title>
     <style>
         * {
             margin: 0;
@@ -45,6 +45,15 @@
         .subtitle {
             opacity: 0.9;
             font-size: 1.1rem;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
         }
         
         .main-content {
@@ -160,17 +169,20 @@
         }
         
         button.secondary {
-            background: #e0e7ff;
-            color: #667eea;
+            background: #10b981;
+            color: white;
         }
         
         button.secondary:hover {
-            background: #c7d2fe;
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
         }
         
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none !important;
         }
         
         .blendshapes-panel {
@@ -180,6 +192,11 @@
             margin-top: 1rem;
             max-height: 400px;
             overflow-y: auto;
+        }
+        
+        .blendshapes-panel h3 {
+            margin-bottom: 1rem;
+            color: #667eea;
         }
         
         .blendshape-item {
@@ -216,8 +233,39 @@
             to { transform: rotate(360deg); }
         }
         
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            padding: 2rem;
+            background: #f8f9ff;
+        }
+        
+        .feature {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-title {
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+        
+        .feature-text {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
         @media (max-width: 768px) {
             .main-content {
+                grid-template-columns: 1fr;
+            }
+            .features {
                 grid-template-columns: 1fr;
             }
         }
@@ -228,7 +276,26 @@
         <header>
             <h1>🎭 Face to Blendshape 3D</h1>
             <p class="subtitle">Generate 3D face models with ARKit blendshapes from a single photo</p>
+            <div class="badge">✨ GLB Export with Texture & Morph Targets</div>
         </header>
+        
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🎨</div>
+                <div class="feature-title">Texture Mapping</div>
+                <div class="feature-text">Face texture extracted from photo</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎯</div>
+                <div class="feature-title">52 Morph Targets</div>
+                <div class="feature-text">Full ARKit blendshape support</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📦</div>
+                <div class="feature-title">GLB Export</div>
+                <div class="feature-text">Ready for Unity, Unreal, Blender</div>
+            </div>
+        </div>
         
         <div class="main-content">
             <div class="upload-section">
@@ -245,13 +312,13 @@
                     <button class="primary" id="processBtn" disabled>
                         <span id="processBtnText">Process Image</span>
                     </button>
-                    <button class="secondary" id="exportBtn" disabled>Export Model</button>
+                    <button class="secondary" id="exportBtn" disabled>📥 Export GLB</button>
                 </div>
                 
                 <div id="status" style="display: none;"></div>
                 
                 <div class="blendshapes-panel" id="blendshapesPanel" style="display: none;">
-                    <h3>ARKit Blendshapes</h3>
+                    <h3>Detected Blendshapes</h3>
                     <div id="blendshapesList"></div>
                 </div>
             </div>

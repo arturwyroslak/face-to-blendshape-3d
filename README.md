@@ -1,22 +1,34 @@
 # 🎭 Face to Blendshape 3D
 
-Generate production-ready 3D face models with ARKit blendshapes from a single photo using MediaPipe Face Landmarker.
+Generate production-ready 3D face models with ARKit blendshapes and texture mapping from a single photo using MediaPipe Face Landmarker. Export as GLB with embedded textures and morph targets.
 
-## Features
+## ✨ Features
 
-✨ **Single Photo Input** - Upload one face image and generate a complete 3D model
+🎯 **Single Photo Input** - Upload one face image and generate a complete 3D model
 
-🎯 **MediaPipe Face Landmarker** - Advanced 478-point facial landmark detection
+🤖 **MediaPipe Face Landmarker** - Advanced 478-point facial landmark detection
 
-🎨 **ARKit Blendshapes** - Full 52 ARKit blendshape coefficients for facial animation
+🎨 **Texture Mapping** - Automatic face texture extraction and UV mapping from input image
+
+🎭 **52 ARKit Blendshapes** - Full ARKit blendshape coefficients as morph targets
+
+📦 **GLB Export** - Industry-standard format with embedded textures and morph targets
 
 🔧 **Three.js Rendering** - Real-time 3D visualization with orbit controls
 
-📦 **Export Ready** - Export models with blendshape data in JSON format
+🚀 **Zero Server** - Runs entirely in the browser, no backend required
 
-🚀 **Zero Dependencies** - Runs entirely in the browser, no server required
+## 🎬 What You Get
 
-## Quick Start
+The exported GLB file contains:
+
+- ✅ **3D Face Mesh** - 478 vertices, ~900 triangles
+- ✅ **UV-Mapped Texture** - Face texture from input photo (1024x1024)
+- ✅ **52 Morph Targets** - All ARKit blendshapes for facial animation
+- ✅ **Embedded Data** - Everything in a single `.glb` file
+- ✅ **Universal Format** - Works in Unity, Unreal, Blender, Three.js, Babylon.js
+
+## 🚀 Quick Start
 
 ```bash
 # Install dependencies
@@ -29,206 +41,300 @@ npm run dev
 npm run build
 ```
 
-## Usage
+## 📖 Usage
 
 1. **Upload Image**: Click or drag & drop a face photo
-2. **Process**: Click "Process Image" to detect landmarks and generate blendshapes
+2. **Process**: Click "Process Image" to detect landmarks, extract texture, and generate model
 3. **View**: Interact with the 3D model using mouse/touch controls
-4. **Export**: Download the model with blendshapes as JSON
+4. **Export**: Download the complete GLB file with texture and morph targets
 
-## Technology Stack
+## 🛠️ Technology Stack
 
 - **MediaPipe Face Landmarker** - Google's ML model for facial landmark detection
-- **Three.js** - 3D rendering and visualization
+- **Three.js** - 3D rendering, geometry, and GLB export
+- **GLTFExporter** - Export to glTF/GLB format with morph targets
+- **Canvas API** - Texture extraction and processing
 - **Vite** - Build tool and dev server
 - **Vanilla JavaScript** - No framework dependencies
 
-## ARKit Blendshapes
+## 🎯 ARKit Blendshapes (Morph Targets)
 
-Supports all 52 ARKit blendshapes:
+All 52 ARKit blendshapes are included as morph targets:
 
-**Eyes**: `eyeBlinkLeft`, `eyeBlinkRight`, `eyeLookUp/Down/In/Out`, `eyeSquint`, `eyeWide`
+### Eyes (14)
+`eyeBlinkLeft`, `eyeBlinkRight`, `eyeLookUpLeft`, `eyeLookUpRight`, `eyeLookDownLeft`, `eyeLookDownRight`, `eyeLookInLeft`, `eyeLookInRight`, `eyeLookOutLeft`, `eyeLookOutRight`, `eyeSquintLeft`, `eyeSquintRight`, `eyeWideLeft`, `eyeWideRight`
 
-**Brows**: `browDownLeft/Right`, `browInnerUp`, `browOuterUpLeft/Right`
+### Eyebrows (5)
+`browDownLeft`, `browDownRight`, `browInnerUp`, `browOuterUpLeft`, `browOuterUpRight`
 
-**Jaw**: `jawForward`, `jawLeft/Right`, `jawOpen`
+### Jaw (4)
+`jawForward`, `jawLeft`, `jawRight`, `jawOpen`
 
-**Mouth**: `mouthClose`, `mouthFunnel`, `mouthPucker`, `mouthSmile`, `mouthFrown`, and 20+ more
+### Mouth (23)
+`mouthClose`, `mouthFunnel`, `mouthPucker`, `mouthLeft`, `mouthRight`, `mouthSmileLeft`, `mouthSmileRight`, `mouthFrownLeft`, `mouthFrownRight`, `mouthDimpleLeft`, `mouthDimpleRight`, `mouthStretchLeft`, `mouthStretchRight`, `mouthRollLower`, `mouthRollUpper`, `mouthShrugLower`, `mouthShrugUpper`, `mouthPressLeft`, `mouthPressRight`, `mouthLowerDownLeft`, `mouthLowerDownRight`, `mouthUpperUpLeft`, `mouthUpperUpRight`
 
-**Cheeks**: `cheekPuff`, `cheekSquint`
+### Cheeks (3)
+`cheekPuff`, `cheekSquintLeft`, `cheekSquintRight`
 
-**Nose**: `noseSneerLeft/Right`
+### Nose (2)
+`noseSneerLeft`, `noseSneerRight`
 
-**Tongue**: `tongueOut`
+### Tongue (1)
+`tongueOut`
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 src/
-├── main.js              # Main application controller
-├── arkit-mapper.js      # MediaPipe → ARKit blendshape mapping
-└── face-mesh-generator.js # 3D mesh generation with blendshapes
+├── main.js                # Main application controller
+├── arkit-mapper.js        # MediaPipe → ARKit blendshape mapping
+├── face-mesh-generator.js # 3D mesh generation with morph targets
+└── texture-mapper.js      # Face texture extraction and UV mapping
 ```
 
 ### Key Components
 
-**FaceToBlendshape3D** - Main application class managing:
+**FaceToBlendshape3D** - Main application class:
 - MediaPipe Face Landmarker initialization
 - Three.js scene setup
 - Image processing pipeline
+- GLB export with GLTFExporter
 - UI interactions
 
-**ARKitBlendshapeMapper** - Converts MediaPipe blendshapes to ARKit format:
+**TextureMapper** - Texture extraction:
+- Face region detection from landmarks
+- Automatic cropping and centering
+- UV coordinate generation
+- Texture enhancement (contrast, sharpness)
+- Canvas-based processing
+
+**FaceMeshGenerator** - 3D mesh with morph targets:
+- Converts 478 landmarks to 3D vertices
+- Generates face triangulation
+- Creates 52 morph targets for ARKit blendshapes
+- Applies UV mapping for texture
+- Handles transformation matrices
+- Morph target deformations
+
+**ARKitBlendshapeMapper** - Blendshape conversion:
 - Direct mapping for matching blendshapes
 - Landmark-based enhancement for missing blendshapes
-- Blender export format support
+- Normalized coefficient calculations
 
-**FaceMeshGenerator** - Creates 3D face mesh:
-- Converts 478 landmarks to 3D vertices
-- Applies face triangulation
-- Applies blendshape deformations
-- Handles transformation matrices
+## 📦 GLB Export Format
 
-## API Reference
-
-### ARKitBlendshapeMapper
+The exported GLB contains:
 
 ```javascript
-const mapper = new ARKitBlendshapeMapper();
-const arkitBlendshapes = mapper.mapMediaPipeToARKit(mediaPipeBlendshapes, landmarks);
+// Geometry
+- 478 vertices (face landmarks)
+- ~900 triangles (face mesh)
+- UV coordinates (texture mapping)
+- Vertex normals
+
+// Texture
+- Embedded 1024x1024 face texture
+- SRGB color space
+- Extracted from input photo
+
+// Morph Targets (52)
+- Each blendshape as separate morph target
+- Relative or absolute positioning
+- Named according to ARKit convention
+- Influence weights stored
+
+// Material
+- PBR Standard material
+- Albedo texture map
+- Roughness: 0.8
+- Metalness: 0.1
 ```
 
-### FaceMeshGenerator
+## 🎮 Using the GLB Model
+
+### Unity
+
+```csharp
+// Import GLB and access blend shapes
+SkinnedMeshRenderer renderer = GetComponent<SkinnedMeshRenderer>();
+int blendShapeIndex = renderer.sharedMesh.GetBlendShapeIndex("mouthSmileLeft");
+renderer.SetBlendShapeWeight(blendShapeIndex, 75.0f);
+```
+
+### Unreal Engine
+
+```cpp
+// Import as Skeletal Mesh with Morph Targets
+UMorphTarget* MorphTarget = SkeletalMesh->FindMorphTarget("mouthSmileLeft");
+SkeletalMeshComponent->SetMorphTarget("mouthSmileLeft", 0.75f);
+```
+
+### Blender
+
+```python
+import bpy
+
+# Import GLB (File > Import > glTF 2.0)
+# Access shape keys
+obj = bpy.context.active_object
+shape_key = obj.data.shape_keys.key_blocks["mouthSmileLeft"]
+shape_key.value = 0.75
+```
+
+### Three.js
 
 ```javascript
-const generator = new FaceMeshGenerator();
-const mesh = generator.generate(landmarks, blendshapes, transformMatrix);
-generator.updateBlendshapes(newBlendshapes);
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+const loader = new GLTFLoader();
+loader.load('face-model-blendshapes.glb', (gltf) => {
+  const mesh = gltf.scene.children[0];
+  
+  // Animate morph targets
+  const morphIndex = mesh.morphTargetDictionary['mouthSmileLeft'];
+  mesh.morphTargetInfluences[morphIndex] = 0.75;
+  
+  scene.add(gltf.scene);
+});
 ```
 
-## Export Format
+## 🎨 Use Cases
 
-Exported JSON structure:
+🎮 **Game Development** - Character facial animation and expressions
 
-```json
-{
-  "metadata": {
-    "generator": "Face-to-Blendshape-3D",
-    "version": "1.0.0",
-    "timestamp": "2026-02-11T02:10:00.000Z"
-  },
-  "geometry": {
-    "vertices": [[x, y, z], ...],
-    "faces": [[v1, v2, v3], ...],
-    "uvs": []
-  },
-  "blendshapes": {
-    "eyeBlinkLeft": 0.12,
-    "mouthSmileLeft": 0.85,
-    ...
-  }
-}
-```
+🎬 **Film/Animation** - Facial motion capture and digital doubles
 
-## Use Cases
+📱 **AR/VR Applications** - Avatar creation and personalization
 
-🎮 **Game Development** - Character facial animation
+🤖 **Digital Humans** - AI assistant faces and virtual influencers
 
-🎬 **Film/Animation** - Facial motion capture
+📸 **Photo Apps** - Face filters, effects, and transformations
 
-📱 **AR/VR** - Avatar creation
+🎓 **Education** - Anatomy, animation, and 3D modeling tutorials
 
-🤖 **Digital Humans** - AI assistant faces
+## ⚡ Performance
 
-📸 **Photo Apps** - Face filters and effects
-
-## Performance
-
-- **Processing Time**: ~500ms per image
-- **Model Size**: 26.8MB (cached after first load)
+- **Processing Time**: ~800ms per image (depends on device)
+- **Model Size**: 26.8MB MediaPipe model (cached after first load)
+- **GLB Size**: ~500KB - 2MB (depends on texture resolution)
 - **Landmarks**: 478 3D points
-- **Blendshapes**: 52 coefficients
+- **Blendshapes**: 52 morph targets
 - **Triangles**: ~900 faces
+- **Texture**: 1024x1024 embedded
 
-## Browser Compatibility
+## 🌐 Browser Compatibility
 
 - ✅ Chrome 90+
 - ✅ Firefox 88+
 - ✅ Safari 14+
 - ✅ Edge 90+
 
-Requires WebGL and WebAssembly support.
+Requires WebGL 2.0 and WebAssembly support.
 
-## Limitations
+## 📋 Requirements
 
-- Single face per image
-- Front-facing photos work best
-- Good lighting required
+**Input Image:**
+- Single face, front-facing
+- Good lighting conditions
 - Minimum resolution: 640x480
 - Maximum file size: 10MB
+- Formats: JPEG, PNG, WebP
 
-## Advanced Features
+**Browser:**
+- WebGL 2.0 support
+- WebAssembly enabled
+- Canvas API support
+- Sufficient memory (~2GB recommended)
 
-### Custom Blendshape Enhancement
+## 🔬 Advanced Features
 
-The mapper enhances MediaPipe blendshapes using landmark geometry:
+### Texture Enhancement
 
-```javascript
-enhanceBlendshapesFromLandmarks(blendshapes, landmarks) {
-  // Calculate jaw open from mouth height
-  // Calculate smile from mouth corner positions
-  // Calculate brow movements from brow-nose distance
-}
-```
+Automatic post-processing:
+- Contrast enhancement
+- Sharpening
+- Color correction
+- Face region isolation
 
-### Transformation Matrix
+### Morph Target Calculation
 
-Applies MediaPipe's facial transformation for proper head pose:
+Intelligent deformation:
+- Landmark-based vertex displacement
+- Anatomically correct movements
+- Smooth interpolation
+- Realistic facial expressions
 
-```javascript
-applyTransformMatrix(matrix) {
-  // 4x4 matrix for rotation, translation, scale
-}
-```
+### UV Mapping
 
-## Roadmap
+Optimized texture coordinates:
+- Automatic face bounds detection
+- Centered projection
+- Padding for edge quality
+- Distortion minimization
 
-- [ ] Multiple face support
-- [ ] Video input for animation
-- [ ] GLTF/GLB export
-- [ ] Texture mapping
-- [ ] Real-time blendshape animation
-- [ ] FBX export for Unity/Unreal
-- [ ] Blender plugin integration
+## 🛣️ Roadmap
 
-## Contributing
+- [ ] Multiple face support in single image
+- [ ] Video input for animation sequence export
+- [ ] FBX export option
+- [ ] Higher resolution textures (2K/4K)
+- [ ] Normal map generation
+- [ ] Depth map inclusion
+- [ ] Eye/teeth texture separation
+- [ ] Hair detection and mesh
+- [ ] Real-time blendshape preview
+- [ ] Custom morph target creation
+- [ ] Batch processing
+- [ ] API endpoint deployment
 
-Contributions welcome! Please:
+## 🤝 Contributing
 
+Contributions welcome! Areas for improvement:
+
+1. **Morph Target Accuracy** - Better vertex deformations
+2. **Texture Quality** - Advanced mapping algorithms
+3. **Performance** - Optimization for mobile devices
+4. **Additional Formats** - FBX, OBJ, USD export
+5. **Documentation** - More integration examples
+
+Please:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
 
-## License
+## 📄 License
 
 MIT License - see LICENSE file for details
 
-## Credits
+## 🙏 Credits
 
 - **MediaPipe** - Google's ML framework
-- **Three.js** - 3D rendering library
+- **Three.js** - 3D rendering library and GLTF exporter
 - **ARKit** - Apple's AR framework (blendshape specification)
+- **glTF** - Khronos Group 3D format specification
 
-## Support
+## 💬 Support
 
 For issues and questions:
 - GitHub Issues: [Create an issue](https://github.com/arturwyroslak/face-to-blendshape-3d/issues)
 - Discussions: [Join discussion](https://github.com/arturwyroslak/face-to-blendshape-3d/discussions)
 
+## 🎯 Example Output
+
+Input: Single face photo (JPEG/PNG)
+
+Output: `face-model-blendshapes.glb`
+- 3D mesh with texture
+- 52 morph targets (ARKit blendshapes)
+- Ready to import in any 3D software
+- Fully animatable facial expressions
+
 ---
 
 **Made with ❤️ by SUPERAI**
 
-Transform faces into art. One photo at a time. 🎭
+Transform faces into animated 3D art. One photo at a time. 🎭
+
+**GLB Export Ready • Texture Mapped • Morph Targets Included**

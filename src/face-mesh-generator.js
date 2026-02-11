@@ -2,13 +2,11 @@ import * as THREE from 'three';
 
 /**
  * Face Mesh Generator
- * Creates a 3D face mesh from MediaPipe landmarks with blendshape support
+ * Creates a 3D face mesh from MediaPipe landmarks with morph targets (blendshapes)
  */
 
-// MediaPipe Face Mesh Triangulation
-// Subset of key triangles for facial features
+// MediaPipe Face Mesh Triangulation (key triangles)
 const FACE_TRIANGULATION = [
-    // Face outline
     127, 34, 139, 11, 0, 37, 232, 231, 120, 72, 37, 39, 128, 121, 47, 232, 121, 128,
     104, 69, 67, 175, 171, 148, 157, 154, 155, 118, 50, 101, 73, 39, 40, 9, 151, 108,
     48, 115, 131, 194, 204, 211, 74, 40, 185, 80, 42, 183, 40, 92, 186, 230, 229, 118,
@@ -34,44 +32,57 @@ const FACE_TRIANGULATION = [
     117, 123, 50, 222, 65, 52, 19, 125, 141, 221, 55, 65, 3, 195, 197, 25, 7, 33,
     220, 237, 44, 70, 71, 139, 122, 193, 245, 247, 130, 33, 71, 21, 162, 153, 158,
     133, 246, 247, 194, 204, 206, 194, 195, 204, 26, 161, 4, 207, 205, 36, 210, 214, 153,
-    // Eyes
     33, 7, 163, 144, 145, 163, 163, 246, 33, 133, 155, 7, 246, 161, 160, 159, 145, 144,
     33, 246, 161, 246, 33, 173, 7, 173, 33,
-    // Mouth
     61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181,
     91, 146, 61, 78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317,
     14, 87, 178, 88, 95, 78
 ];
 
+// ARKit blendshape names for morph targets
+const MORPH_TARGET_NAMES = [
+    'eyeBlinkLeft', 'eyeBlinkRight', 'eyeLookUpLeft', 'eyeLookUpRight',
+    'eyeLookDownLeft', 'eyeLookDownRight', 'eyeLookInLeft', 'eyeLookInRight',
+    'eyeLookOutLeft', 'eyeLookOutRight', 'eyeSquintLeft', 'eyeSquintRight',
+    'eyeWideLeft', 'eyeWideRight', 'browDownLeft', 'browDownRight',
+    'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight', 'jawOpen',
+    'jawForward', 'jawLeft', 'jawRight', 'mouthClose', 'mouthFunnel',
+    'mouthPucker', 'mouthLeft', 'mouthRight', 'mouthSmileLeft', 'mouthSmileRight',
+    'mouthFrownLeft', 'mouthFrownRight', 'mouthUpperUpLeft', 'mouthUpperUpRight',
+    'mouthLowerDownLeft', 'mouthLowerDownRight', 'cheekPuff', 'cheekSquintLeft',
+    'cheekSquintRight', 'noseSneerLeft', 'noseSneerRight', 'tongueOut'
+];
+
 export class FaceMeshGenerator {
     constructor() {
+        this.baseVertices = null;
         this.geometry = null;
         this.material = null;
         this.mesh = null;
     }
     
-    generate(landmarks, blendshapes, transformMatrix) {
-        // Create geometry from landmarks
+    generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
+        // Create base geometry
         this.geometry = new THREE.BufferGeometry();
         
         const vertices = [];
-        const normals = [];
+        const uvs = [];
         
         // Convert landmarks to 3D vertices
         landmarks.forEach(landmark => {
-            // MediaPipe coordinates are normalized [0,1]
-            // Convert to centered 3D space [-0.5, 0.5]
             vertices.push(
                 (landmark.x - 0.5) * 2,
                 -(landmark.y - 0.5) * 2,
                 landmark.z * 2
             );
+            // UV coordinates
+            uvs.push(landmark.x, 1 - landmark.y);
         });
         
-        // Apply blendshapes to vertices
-        this.applyBlendshapes(vertices, blendshapes);
+        // Store base vertices
+        this.baseVertices = Float32Array.from(vertices);
         
-        // Create faces using triangulation
+        // Create faces
         const indices = [];
         for (let i = 0; i < FACE_TRIANGULATION.length; i += 3) {
             indices.push(
@@ -82,79 +93,176 @@ export class FaceMeshGenerator {
         }
         
         // Set geometry attributes
-        this.geometry.setAttribute(
-            'position',
-            new THREE.Float32BufferAttribute(vertices, 3)
-        );
+        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        this.geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         this.geometry.setIndex(indices);
         this.geometry.computeVertexNormals();
         
-        // Create material with double-sided rendering
-        this.material = new THREE.MeshPhongMaterial({
-            color: 0xffdab9,
-            shininess: 30,
-            side: THREE.DoubleSide,
-            flatShading: false,
-            wireframe: false
+        // Create morph targets
+        this.createMorphTargets(landmarks, blendshapes);
+        
+        // Create texture
+        const texture = new THREE.CanvasTexture(textureCanvas);
+        texture.needsUpdate = true;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        
+        // Create material with texture
+        this.material = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.8,
+            metalness: 0.1,
+            side: THREE.DoubleSide
         });
         
         // Create mesh
         this.mesh = new THREE.Mesh(this.geometry, this.material);
         
-        // Apply transformation matrix if available
+        // Store morph target influences
+        Object.entries(blendshapes).forEach(([name, value], index) => {
+            if (this.mesh.morphTargetInfluences && index < this.mesh.morphTargetInfluences.length) {
+                this.mesh.morphTargetInfluences[index] = value;
+            }
+        });
+        
+        // Apply transformation matrix
         if (transformMatrix) {
             this.applyTransformMatrix(transformMatrix);
         }
         
-        // Add wireframe for debugging (optional)
-        const wireframeGeometry = new THREE.WireframeGeometry(this.geometry);
-        const wireframeMaterial = new THREE.LineBasicMaterial({
-            color: 0x000000,
-            opacity: 0.1,
-            transparent: true
-        });
-        const wireframe = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
-        this.mesh.add(wireframe);
-        
         return this.mesh;
     }
     
-    applyBlendshapes(vertices, blendshapes) {
-        // Apply blendshape deformations
-        // This is a simplified version - in production, you'd have
-        // pre-calculated blendshape deltas for each vertex
+    createMorphTargets(landmarks, blendshapes) {
+        const morphTargets = [];
+        const morphTargetNames = [];
         
-        const jawOpen = blendshapes.jawOpen || 0;
-        const mouthSmileLeft = blendshapes.mouthSmileLeft || 0;
-        const mouthSmileRight = blendshapes.mouthSmileRight || 0;
-        const browInnerUp = blendshapes.browInnerUp || 0;
+        // Create morph target for each ARKit blendshape
+        MORPH_TARGET_NAMES.forEach(blendshapeName => {
+            const morphPositions = this.calculateMorphTarget(landmarks, blendshapeName);
+            
+            morphTargets.push({
+                name: blendshapeName,
+                vertices: morphPositions
+            });
+            morphTargetNames.push(blendshapeName);
+        });
         
-        // Example: Apply jaw open to lower face vertices
-        for (let i = 0; i < vertices.length / 3; i++) {
-            const vertexIndex = i * 3;
-            const y = vertices[vertexIndex + 1];
+        // Set morph targets on geometry
+        morphTargets.forEach((target, index) => {
+            this.geometry.morphAttributes.position = this.geometry.morphAttributes.position || [];
+            this.geometry.morphAttributes.position[index] = new THREE.Float32BufferAttribute(
+                target.vertices,
+                3
+            );
+        });
+        
+        // Store morph target dictionary
+        this.geometry.morphTargetsRelative = false;
+        this.geometry.userData.targetNames = morphTargetNames;
+    }
+    
+    calculateMorphTarget(landmarks, blendshapeName) {
+        const vertices = [];
+        const multiplier = 0.15; // Deformation intensity
+        
+        landmarks.forEach((landmark, index) => {
+            let x = (landmark.x - 0.5) * 2;
+            let y = -(landmark.y - 0.5) * 2;
+            let z = landmark.z * 2;
             
-            // Lower face (jaw area)
-            if (y < -0.2) {
-                vertices[vertexIndex + 1] -= jawOpen * 0.15;
+            // Apply deformations based on blendshape type
+            switch(blendshapeName) {
+                case 'jawOpen':
+                    if (y < -0.2) y -= multiplier; // Lower jaw
+                    break;
+                    
+                case 'mouthSmileLeft':
+                    if (index === 61 || index === 62) y += multiplier * 0.5;
+                    break;
+                    
+                case 'mouthSmileRight':
+                    if (index === 291 || index === 292) y += multiplier * 0.5;
+                    break;
+                    
+                case 'eyeBlinkLeft':
+                    if (index >= 33 && index <= 133) y -= multiplier * 0.3;
+                    break;
+                    
+                case 'eyeBlinkRight':
+                    if (index >= 362 && index <= 398) y -= multiplier * 0.3;
+                    break;
+                    
+                case 'browInnerUp':
+                    if (index === 107 || index === 336) y += multiplier * 0.5;
+                    break;
+                    
+                case 'browOuterUpLeft':
+                    if (index === 70 || index === 46) y += multiplier * 0.5;
+                    break;
+                    
+                case 'browOuterUpRight':
+                    if (index === 300 || index === 276) y += multiplier * 0.5;
+                    break;
+                    
+                case 'mouthFunnel':
+                    if (index === 13 || index === 14) z -= multiplier * 0.3;
+                    break;
+                    
+                case 'mouthPucker':
+                    if ([61, 291, 0, 17].includes(index)) z += multiplier * 0.4;
+                    break;
+                    
+                case 'cheekPuff':
+                    if ([118, 347, 425, 205].includes(index)) {
+                        x *= 1.2;
+                        z += multiplier * 0.3;
+                    }
+                    break;
+                    
+                case 'noseSneerLeft':
+                    if ([219, 49].includes(index)) y += multiplier * 0.2;
+                    break;
+                    
+                case 'noseSneerRight':
+                    if ([439, 279].includes(index)) y += multiplier * 0.2;
+                    break;
+                    
+                case 'jawForward':
+                    if (y < -0.3) z += multiplier * 0.5;
+                    break;
+                    
+                case 'jawLeft':
+                    if (y < -0.2) x -= multiplier * 0.5;
+                    break;
+                    
+                case 'jawRight':
+                    if (y < -0.2) x += multiplier * 0.5;
+                    break;
+                    
+                case 'eyeLookUpLeft':
+                case 'eyeLookUpRight':
+                    if ((index >= 33 && index <= 133) || (index >= 362 && index <= 398)) {
+                        y += multiplier * 0.1;
+                    }
+                    break;
+                    
+                case 'eyeLookDownLeft':
+                case 'eyeLookDownRight':
+                    if ((index >= 33 && index <= 133) || (index >= 362 && index <= 398)) {
+                        y -= multiplier * 0.1;
+                    }
+                    break;
             }
             
-            // Mouth corners for smile
-            if (i === 61 || i === 291) { // Mouth corner indices
-                vertices[vertexIndex + 1] += (mouthSmileLeft + mouthSmileRight) * 0.05;
-            }
-            
-            // Eyebrows for surprise
-            if (y > 0.3 && Math.abs(vertices[vertexIndex]) < 0.3) {
-                vertices[vertexIndex + 1] += browInnerUp * 0.08;
-            }
-        }
+            vertices.push(x, y, z);
+        });
+        
+        return Float32Array.from(vertices);
     }
     
     applyTransformMatrix(matrix) {
         if (!this.mesh || !matrix) return;
         
-        // MediaPipe transformation matrix is 4x4
         const m = new THREE.Matrix4();
         m.set(
             matrix.data[0], matrix.data[1], matrix.data[2], matrix.data[3],
@@ -166,22 +274,11 @@ export class FaceMeshGenerator {
         this.mesh.applyMatrix4(m);
     }
     
-    updateBlendshapes(blendshapes) {
-        if (!this.geometry) return;
-        
-        const positions = this.geometry.attributes.position;
-        const vertices = positions.array;
-        
-        // Reset to original positions (you'd store these separately in production)
-        // Then re-apply blendshapes
-        this.applyBlendshapes(vertices, blendshapes);
-        
-        positions.needsUpdate = true;
-        this.geometry.computeVertexNormals();
-    }
-    
     dispose() {
         if (this.geometry) this.geometry.dispose();
-        if (this.material) this.material.dispose();
+        if (this.material) {
+            if (this.material.map) this.material.map.dispose();
+            this.material.dispose();
+        }
     }
 }

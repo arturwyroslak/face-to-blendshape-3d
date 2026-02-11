@@ -1,6 +1,6 @@
 {
   "name": "face-to-blendshape-3d",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Generate 3D face models with ARKit blendshapes from a single photo using MediaPipe Face Landmarker",
   "type": "module",
   "scripts": {
