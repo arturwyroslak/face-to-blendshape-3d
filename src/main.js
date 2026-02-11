@@ -23,16 +23,26 @@ class FaceToBlendshape3D {
         
         // Debug parameters
         this.debugParams = {
-            scaleMultiplierX: 1.15,
-            scaleMultiplierY: 1.45,
-            scaleMultiplierZ: 1.45,
-            posOffsetX: 0,
-            posOffsetY: 0,
-            posOffsetZ: 0,
-            pushBackFactor: 0.40
+            head: {
+                scaleMultiplierX: 1.15,
+                scaleMultiplierY: 1.45,
+                scaleMultiplierZ: 1.45,
+                posOffsetX: 0,
+                posOffsetY: 0,
+                posOffsetZ: 0,
+                pushBackFactor: 0.40
+            },
+            face: {
+                scaleX: 1.0,
+                scaleY: 1.0,
+                scaleZ: 1.0,
+                posOffsetX: 0,
+                posOffsetY: 0,
+                posOffsetZ: 0
+            }
         };
         
-        this.faceData = null; // Store face dimensions for recalculation
+        this.faceData = null;
         
         this.init();
     }
@@ -135,93 +145,177 @@ class FaceToBlendshape3D {
     }
     
     initDebugControls() {
-        const sliders = {
-            scaleX: document.getElementById('scaleXSlider'),
-            scaleY: document.getElementById('scaleYSlider'),
-            scaleZ: document.getElementById('scaleZSlider'),
-            posX: document.getElementById('posXSlider'),
-            posY: document.getElementById('posYSlider'),
-            posZ: document.getElementById('posZSlider'),
-            pushBack: document.getElementById('pushBackSlider')
+        // Head controls
+        const headSliders = {
+            scaleX: document.getElementById('headScaleXSlider'),
+            scaleY: document.getElementById('headScaleYSlider'),
+            scaleZ: document.getElementById('headScaleZSlider'),
+            posX: document.getElementById('headPosXSlider'),
+            posY: document.getElementById('headPosYSlider'),
+            posZ: document.getElementById('headPosZSlider'),
+            pushBack: document.getElementById('headPushBackSlider')
         };
         
-        const values = {
-            scaleX: document.getElementById('scaleXValue'),
-            scaleY: document.getElementById('scaleYValue'),
-            scaleZ: document.getElementById('scaleZValue'),
-            posX: document.getElementById('posXValue'),
-            posY: document.getElementById('posYValue'),
-            posZ: document.getElementById('posZValue'),
-            pushBack: document.getElementById('pushBackValue')
+        const headValues = {
+            scaleX: document.getElementById('headScaleXValue'),
+            scaleY: document.getElementById('headScaleYValue'),
+            scaleZ: document.getElementById('headScaleZValue'),
+            posX: document.getElementById('headPosXValue'),
+            posY: document.getElementById('headPosYValue'),
+            posZ: document.getElementById('headPosZValue'),
+            pushBack: document.getElementById('headPushBackValue')
         };
         
-        sliders.scaleX.addEventListener('input', (e) => {
-            this.debugParams.scaleMultiplierX = parseFloat(e.target.value);
-            values.scaleX.textContent = e.target.value;
+        // Face controls
+        const faceSliders = {
+            scaleX: document.getElementById('faceScaleXSlider'),
+            scaleY: document.getElementById('faceScaleYSlider'),
+            scaleZ: document.getElementById('faceScaleZSlider'),
+            posX: document.getElementById('facePosXSlider'),
+            posY: document.getElementById('facePosYSlider'),
+            posZ: document.getElementById('facePosZSlider')
+        };
+        
+        const faceValues = {
+            scaleX: document.getElementById('faceScaleXValue'),
+            scaleY: document.getElementById('faceScaleYValue'),
+            scaleZ: document.getElementById('faceScaleZValue'),
+            posX: document.getElementById('facePosXValue'),
+            posY: document.getElementById('facePosYValue'),
+            posZ: document.getElementById('facePosZValue')
+        };
+        
+        // Head slider listeners
+        headSliders.scaleX.addEventListener('input', (e) => {
+            this.debugParams.head.scaleMultiplierX = parseFloat(e.target.value);
+            headValues.scaleX.textContent = e.target.value;
             this.updateHeadTransform();
         });
         
-        sliders.scaleY.addEventListener('input', (e) => {
-            this.debugParams.scaleMultiplierY = parseFloat(e.target.value);
-            values.scaleY.textContent = e.target.value;
+        headSliders.scaleY.addEventListener('input', (e) => {
+            this.debugParams.head.scaleMultiplierY = parseFloat(e.target.value);
+            headValues.scaleY.textContent = e.target.value;
             this.updateHeadTransform();
         });
         
-        sliders.scaleZ.addEventListener('input', (e) => {
-            this.debugParams.scaleMultiplierZ = parseFloat(e.target.value);
-            values.scaleZ.textContent = e.target.value;
+        headSliders.scaleZ.addEventListener('input', (e) => {
+            this.debugParams.head.scaleMultiplierZ = parseFloat(e.target.value);
+            headValues.scaleZ.textContent = e.target.value;
             this.updateHeadTransform();
         });
         
-        sliders.posX.addEventListener('input', (e) => {
-            this.debugParams.posOffsetX = parseFloat(e.target.value);
-            values.posX.textContent = e.target.value;
+        headSliders.posX.addEventListener('input', (e) => {
+            this.debugParams.head.posOffsetX = parseFloat(e.target.value);
+            headValues.posX.textContent = e.target.value;
             this.updateHeadTransform();
         });
         
-        sliders.posY.addEventListener('input', (e) => {
-            this.debugParams.posOffsetY = parseFloat(e.target.value);
-            values.posY.textContent = e.target.value;
+        headSliders.posY.addEventListener('input', (e) => {
+            this.debugParams.head.posOffsetY = parseFloat(e.target.value);
+            headValues.posY.textContent = e.target.value;
             this.updateHeadTransform();
         });
         
-        sliders.posZ.addEventListener('input', (e) => {
-            this.debugParams.posOffsetZ = parseFloat(e.target.value);
-            values.posZ.textContent = e.target.value;
+        headSliders.posZ.addEventListener('input', (e) => {
+            this.debugParams.head.posOffsetZ = parseFloat(e.target.value);
+            headValues.posZ.textContent = e.target.value;
             this.updateHeadTransform();
         });
         
-        sliders.pushBack.addEventListener('input', (e) => {
-            this.debugParams.pushBackFactor = parseFloat(e.target.value);
-            values.pushBack.textContent = e.target.value;
+        headSliders.pushBack.addEventListener('input', (e) => {
+            this.debugParams.head.pushBackFactor = parseFloat(e.target.value);
+            headValues.pushBack.textContent = e.target.value;
             this.updateHeadTransform();
         });
         
+        // Face slider listeners
+        faceSliders.scaleX.addEventListener('input', (e) => {
+            this.debugParams.face.scaleX = parseFloat(e.target.value);
+            faceValues.scaleX.textContent = e.target.value;
+            this.updateFaceTransform();
+        });
+        
+        faceSliders.scaleY.addEventListener('input', (e) => {
+            this.debugParams.face.scaleY = parseFloat(e.target.value);
+            faceValues.scaleY.textContent = e.target.value;
+            this.updateFaceTransform();
+        });
+        
+        faceSliders.scaleZ.addEventListener('input', (e) => {
+            this.debugParams.face.scaleZ = parseFloat(e.target.value);
+            faceValues.scaleZ.textContent = e.target.value;
+            this.updateFaceTransform();
+        });
+        
+        faceSliders.posX.addEventListener('input', (e) => {
+            this.debugParams.face.posOffsetX = parseFloat(e.target.value);
+            faceValues.posX.textContent = e.target.value;
+            this.updateFaceTransform();
+        });
+        
+        faceSliders.posY.addEventListener('input', (e) => {
+            this.debugParams.face.posOffsetY = parseFloat(e.target.value);
+            faceValues.posY.textContent = e.target.value;
+            this.updateFaceTransform();
+        });
+        
+        faceSliders.posZ.addEventListener('input', (e) => {
+            this.debugParams.face.posOffsetZ = parseFloat(e.target.value);
+            faceValues.posZ.textContent = e.target.value;
+            this.updateFaceTransform();
+        });
+        
+        // Reset button
         document.getElementById('resetDebugBtn').addEventListener('click', () => {
-            sliders.scaleX.value = 1.15;
-            sliders.scaleY.value = 1.45;
-            sliders.scaleZ.value = 1.45;
-            sliders.posX.value = 0;
-            sliders.posY.value = 0;
-            sliders.posZ.value = 0;
-            sliders.pushBack.value = 0.40;
-            sliders.scaleX.dispatchEvent(new Event('input'));
-            sliders.scaleY.dispatchEvent(new Event('input'));
-            sliders.scaleZ.dispatchEvent(new Event('input'));
-            sliders.posX.dispatchEvent(new Event('input'));
-            sliders.posY.dispatchEvent(new Event('input'));
-            sliders.posZ.dispatchEvent(new Event('input'));
-            sliders.pushBack.dispatchEvent(new Event('input'));
+            // Reset head
+            headSliders.scaleX.value = 1.15;
+            headSliders.scaleY.value = 1.45;
+            headSliders.scaleZ.value = 1.45;
+            headSliders.posX.value = 0;
+            headSliders.posY.value = 0;
+            headSliders.posZ.value = 0;
+            headSliders.pushBack.value = 0.40;
+            // Reset face
+            faceSliders.scaleX.value = 1.0;
+            faceSliders.scaleY.value = 1.0;
+            faceSliders.scaleZ.value = 1.0;
+            faceSliders.posX.value = 0;
+            faceSliders.posY.value = 0;
+            faceSliders.posZ.value = 0;
+            // Trigger updates
+            headSliders.scaleX.dispatchEvent(new Event('input'));
+            headSliders.scaleY.dispatchEvent(new Event('input'));
+            headSliders.scaleZ.dispatchEvent(new Event('input'));
+            headSliders.posX.dispatchEvent(new Event('input'));
+            headSliders.posY.dispatchEvent(new Event('input'));
+            headSliders.posZ.dispatchEvent(new Event('input'));
+            headSliders.pushBack.dispatchEvent(new Event('input'));
+            faceSliders.scaleX.dispatchEvent(new Event('input'));
+            faceSliders.scaleY.dispatchEvent(new Event('input'));
+            faceSliders.scaleZ.dispatchEvent(new Event('input'));
+            faceSliders.posX.dispatchEvent(new Event('input'));
+            faceSliders.posY.dispatchEvent(new Event('input'));
+            faceSliders.posZ.dispatchEvent(new Event('input'));
         });
         
+        // Copy button
         document.getElementById('copyValuesBtn').addEventListener('click', () => {
-            const text = `scaleMultiplierX: ${this.debugParams.scaleMultiplierX}
-scaleMultiplierY: ${this.debugParams.scaleMultiplierY}
-scaleMultiplierZ: ${this.debugParams.scaleMultiplierZ}
-posOffsetX: ${this.debugParams.posOffsetX}
-posOffsetY: ${this.debugParams.posOffsetY}
-posOffsetZ: ${this.debugParams.posOffsetZ}
-pushBackFactor: ${this.debugParams.pushBackFactor}`;
+            const text = `HEAD:
+scaleMultiplierX: ${this.debugParams.head.scaleMultiplierX}
+scaleMultiplierY: ${this.debugParams.head.scaleMultiplierY}
+scaleMultiplierZ: ${this.debugParams.head.scaleMultiplierZ}
+posOffsetX: ${this.debugParams.head.posOffsetX}
+posOffsetY: ${this.debugParams.head.posOffsetY}
+posOffsetZ: ${this.debugParams.head.posOffsetZ}
+pushBackFactor: ${this.debugParams.head.pushBackFactor}
+
+FACE:
+scaleX: ${this.debugParams.face.scaleX}
+scaleY: ${this.debugParams.face.scaleY}
+scaleZ: ${this.debugParams.face.scaleZ}
+posOffsetX: ${this.debugParams.face.posOffsetX}
+posOffsetY: ${this.debugParams.face.posOffsetY}
+posOffsetZ: ${this.debugParams.face.posOffsetZ}`;
             navigator.clipboard.writeText(text);
             alert('Values copied to clipboard!');
         });
@@ -230,9 +324,8 @@ pushBackFactor: ${this.debugParams.pushBackFactor}`;
     updateHeadTransform() {
         if (!this.headModel || !this.faceData) return;
         
-        const { faceWidth, faceHeight, faceCenter, headBox } = this.faceData;
+        const { faceWidth, faceHeight, faceCenter } = this.faceData;
         
-        // Reset head
         this.headModel.scale.set(1, 1, 1);
         this.headModel.rotation.set(0, 0, 0);
         this.headModel.position.set(0, 0, 0);
@@ -242,12 +335,12 @@ pushBackFactor: ${this.debugParams.pushBackFactor}`;
         const headWidth = resetHeadBox.max.x - resetHeadBox.min.x;
         const headHeight = resetHeadBox.max.y - resetHeadBox.min.y;
         
-        const targetHeadWidth = faceWidth * this.debugParams.scaleMultiplierX;
-        const targetHeadHeight = faceHeight * this.debugParams.scaleMultiplierY;
+        const targetHeadWidth = faceWidth * this.debugParams.head.scaleMultiplierX;
+        const targetHeadHeight = faceHeight * this.debugParams.head.scaleMultiplierY;
         
         const scaleX = targetHeadWidth / headWidth;
         const scaleY = targetHeadHeight / headHeight;
-        const scaleZ = Math.max(scaleX, scaleY) * (this.debugParams.scaleMultiplierZ / this.debugParams.scaleMultiplierY);
+        const scaleZ = Math.max(scaleX, scaleY) * (this.debugParams.head.scaleMultiplierZ / this.debugParams.head.scaleMultiplierY);
         
         this.headModel.scale.set(scaleX, scaleY, scaleZ);
         this.headModel.updateMatrixWorld(true);
@@ -256,28 +349,69 @@ pushBackFactor: ${this.debugParams.pushBackFactor}`;
         const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
         const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
         
-        const offsetX = faceCenter.x - scaledHeadCenter.x + this.debugParams.posOffsetX;
-        const offsetY = faceCenter.y - scaledHeadCenter.y + this.debugParams.posOffsetY;
+        const offsetX = faceCenter.x - scaledHeadCenter.x + this.debugParams.head.posOffsetX;
+        const offsetY = faceCenter.y - scaledHeadCenter.y + this.debugParams.head.posOffsetY;
         let targetZ = faceCenter.z - scaledHeadCenter.z;
-        const pushBack = scaledHeadDepth * this.debugParams.pushBackFactor;
-        const offsetZ = targetZ - pushBack + this.debugParams.posOffsetZ;
+        const pushBack = scaledHeadDepth * this.debugParams.head.pushBackFactor;
+        const offsetZ = targetZ - pushBack + this.debugParams.head.posOffsetZ;
         
         this.headModel.position.set(offsetX, offsetY, offsetZ);
+        this.updateDebugDisplay();
+    }
+    
+    updateFaceTransform() {
+        if (!this.faceMesh || !this.faceData) return;
         
+        const { originalPosition } = this.faceData;
+        
+        this.faceMesh.scale.set(
+            this.debugParams.face.scaleX,
+            this.debugParams.face.scaleY,
+            this.debugParams.face.scaleZ
+        );
+        
+        this.faceMesh.position.set(
+            originalPosition.x + this.debugParams.face.posOffsetX,
+            originalPosition.y + this.debugParams.face.posOffsetY,
+            originalPosition.z + this.debugParams.face.posOffsetZ
+        );
+        
+        // Recalculate face data after transform
+        this.faceMesh.geometry.computeBoundingBox();
+        const faceBox = new THREE.Box3().setFromObject(this.faceMesh);
+        const faceWidth = faceBox.max.x - faceBox.min.x;
+        const faceHeight = faceBox.max.y - faceBox.min.y;
+        const faceCenter = faceBox.getCenter(new THREE.Vector3());
+        
+        this.faceData.faceWidth = faceWidth;
+        this.faceData.faceHeight = faceHeight;
+        this.faceData.faceCenter = faceCenter;
+        
+        this.updateHeadTransform();
         this.updateDebugDisplay();
     }
     
     updateDebugDisplay() {
         const debugValues = document.getElementById('debugValues');
-        debugValues.textContent = `Current Values:
+        debugValues.textContent = `HEAD:
 {
-  scaleMultiplierX: ${this.debugParams.scaleMultiplierX},
-  scaleMultiplierY: ${this.debugParams.scaleMultiplierY},
-  scaleMultiplierZ: ${this.debugParams.scaleMultiplierZ},
-  posOffsetX: ${this.debugParams.posOffsetX},
-  posOffsetY: ${this.debugParams.posOffsetY},
-  posOffsetZ: ${this.debugParams.posOffsetZ},
-  pushBackFactor: ${this.debugParams.pushBackFactor}
+  scaleMultiplierX: ${this.debugParams.head.scaleMultiplierX},
+  scaleMultiplierY: ${this.debugParams.head.scaleMultiplierY},
+  scaleMultiplierZ: ${this.debugParams.head.scaleMultiplierZ},
+  posOffsetX: ${this.debugParams.head.posOffsetX},
+  posOffsetY: ${this.debugParams.head.posOffsetY},
+  posOffsetZ: ${this.debugParams.head.posOffsetZ},
+  pushBackFactor: ${this.debugParams.head.pushBackFactor}
+}
+
+FACE:
+{
+  scaleX: ${this.debugParams.face.scaleX},
+  scaleY: ${this.debugParams.face.scaleY},
+  scaleZ: ${this.debugParams.face.scaleZ},
+  posOffsetX: ${this.debugParams.face.posOffsetX},
+  posOffsetY: ${this.debugParams.face.posOffsetY},
+  posOffsetZ: ${this.debugParams.face.posOffsetZ}
 }`;
     }
     
@@ -348,10 +482,11 @@ pushBackFactor: ${this.debugParams.pushBackFactor}`;
                 const faceWidth = faceBox.max.x - faceBox.min.x;
                 const faceHeight = faceBox.max.y - faceBox.min.y;
                 const faceCenter = faceBox.getCenter(new THREE.Vector3());
+                const originalPosition = this.faceMesh.position.clone();
                 
                 const headBox = new THREE.Box3().setFromObject(this.headModel);
                 
-                this.faceData = { faceWidth, faceHeight, faceCenter, headBox };
+                this.faceData = { faceWidth, faceHeight, faceCenter, headBox, originalPosition };
                 
                 const skinColor = this.faceMesh.userData.skinColor;
                 if (skinColor) {
