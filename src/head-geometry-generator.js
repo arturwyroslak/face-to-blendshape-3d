@@ -10,12 +10,12 @@ export class HeadGeometryGenerator {
         const vertices = [];
         const colors = [];
         
-        // Apply subtle width correction (0.92 = 8% narrower)
-        const correctedScaleX = scaleX * 1.08;  // Divide by this to make narrower
+        // Use corrected scale passed from main generator
+        // scaleX already includes the 1.08 width correction
         
         // Face vertices (0-467) with POSITIVE Z
         faceLandmarks.forEach((landmark) => {
-            const x = (landmark.x - centerX) / correctedScaleX * 2;
+            const x = (landmark.x - centerX) / scaleX * 2;
             const y = -(landmark.y - centerY) / scaleY * 2;
             const z = ((landmark.z - centerZ) / scaleZ * 2);  // POSITIVE
             
@@ -43,7 +43,7 @@ export class HeadGeometryGenerator {
         // Generate back vertices
         const backData = this.generateBackVertices(
             faceLandmarks, contourIndices, skinColor,
-            centerX, centerY, centerZ, correctedScaleX, scaleY, scaleZ
+            centerX, centerY, centerZ, scaleX, scaleY, scaleZ
         );
         
         backData.vertices.forEach(v => {
