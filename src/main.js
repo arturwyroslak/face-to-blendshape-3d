@@ -20,6 +20,20 @@ class FaceToBlendshape3D {
         this.blendshapes = {};
         this.currentImage = null;
         this.textureCanvas = null;
+        
+        // Debug parameters
+        this.debugParams = {
+            scaleMultiplierX: 1.15,
+            scaleMultiplierY: 1.45,
+            scaleMultiplierZ: 1.45,
+            posOffsetX: 0,
+            posOffsetY: 0,
+            posOffsetZ: 0,
+            pushBackFactor: 0.40
+        };
+        
+        this.faceData = null; // Store face dimensions for recalculation
+        
         this.init();
     }
     
@@ -27,6 +41,7 @@ class FaceToBlendshape3D {
         await this.initMediaPipe();
         this.initThreeJS();
         this.initEventListeners();
+        this.initDebugControls();
         this.animate();
     }
     
@@ -62,8 +77,6 @@ class FaceToBlendshape3D {
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
         this.renderer.setSize(container.clientWidth, container.clientHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
-        
-        // Enable shadows
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         
@@ -71,37 +84,27 @@ class FaceToBlendshape3D {
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
         
-        // AGGRESSIVE LIGHTING
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         this.scene.add(ambientLight);
-        
         const frontLight = new THREE.DirectionalLight(0xffffff, 1.0);
         frontLight.position.set(0, 0, 5);
-        frontLight.castShadow = false;
         this.scene.add(frontLight);
-        
         const topLight = new THREE.DirectionalLight(0xffffff, 0.8);
         topLight.position.set(0, 5, 0);
-        topLight.castShadow = false;
         this.scene.add(topLight);
-        
         const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
         backLight.position.set(0, 0, -5);
         this.scene.add(backLight);
-        
         const leftLight = new THREE.PointLight(0xffffff, 0.5);
         leftLight.position.set(-5, 0, 0);
         this.scene.add(leftLight);
-        
         const rightLight = new THREE.PointLight(0xffffff, 0.5);
         rightLight.position.set(5, 0, 0);
         this.scene.add(rightLight);
         
         const loader = new GLTFLoader();
-        
         loader.load(headModelUrl, (gltf) => {
             this.headModel = gltf.scene;
-            
             this.headModel.traverse((child) => {
                 if (child.isMesh) {
                     const forcedMat = new THREE.MeshStandardMaterial({
@@ -118,19 +121,164 @@ class FaceToBlendshape3D {
                     child.receiveShadow = false;
                 }
             });
-            
             const box = new THREE.Box3().setFromObject(this.headModel);
             const center = box.getCenter(new THREE.Vector3());
             this.headModel.position.sub(center);
-            
             this.scene.add(this.headModel);
             this.headModel.visible = false;
         }, undefined, (error) => {
-            console.error('[ERROR] Loading head model:', error);
+            console.error('Error loading head model:', error);
             this.showStatus('Failed to load head model.', 'error');
         });
         
         window.addEventListener('resize', () => this.onResize());
+    }
+    
+    initDebugControls() {
+        const sliders = {
+            scaleX: document.getElementById('scaleXSlider'),
+            scaleY: document.getElementById('scaleYSlider'),
+            scaleZ: document.getElementById('scaleZSlider'),
+            posX: document.getElementById('posXSlider'),
+            posY: document.getElementById('posYSlider'),
+            posZ: document.getElementById('posZSlider'),
+            pushBack: document.getElementById('pushBackSlider')
+        };
+        
+        const values = {
+            scaleX: document.getElementById('scaleXValue'),
+            scaleY: document.getElementById('scaleYValue'),
+            scaleZ: document.getElementById('scaleZValue'),
+            posX: document.getElementById('posXValue'),
+            posY: document.getElementById('posYValue'),
+            posZ: document.getElementById('posZValue'),
+            pushBack: document.getElementById('pushBackValue')
+        };
+        
+        sliders.scaleX.addEventListener('input', (e) => {
+            this.debugParams.scaleMultiplierX = parseFloat(e.target.value);
+            values.scaleX.textContent = e.target.value;
+            this.updateHeadTransform();
+        });
+        
+        sliders.scaleY.addEventListener('input', (e) => {
+            this.debugParams.scaleMultiplierY = parseFloat(e.target.value);
+            values.scaleY.textContent = e.target.value;
+            this.updateHeadTransform();
+        });
+        
+        sliders.scaleZ.addEventListener('input', (e) => {
+            this.debugParams.scaleMultiplierZ = parseFloat(e.target.value);
+            values.scaleZ.textContent = e.target.value;
+            this.updateHeadTransform();
+        });
+        
+        sliders.posX.addEventListener('input', (e) => {
+            this.debugParams.posOffsetX = parseFloat(e.target.value);
+            values.posX.textContent = e.target.value;
+            this.updateHeadTransform();
+        });
+        
+        sliders.posY.addEventListener('input', (e) => {
+            this.debugParams.posOffsetY = parseFloat(e.target.value);
+            values.posY.textContent = e.target.value;
+            this.updateHeadTransform();
+        });
+        
+        sliders.posZ.addEventListener('input', (e) => {
+            this.debugParams.posOffsetZ = parseFloat(e.target.value);
+            values.posZ.textContent = e.target.value;
+            this.updateHeadTransform();
+        });
+        
+        sliders.pushBack.addEventListener('input', (e) => {
+            this.debugParams.pushBackFactor = parseFloat(e.target.value);
+            values.pushBack.textContent = e.target.value;
+            this.updateHeadTransform();
+        });
+        
+        document.getElementById('resetDebugBtn').addEventListener('click', () => {
+            sliders.scaleX.value = 1.15;
+            sliders.scaleY.value = 1.45;
+            sliders.scaleZ.value = 1.45;
+            sliders.posX.value = 0;
+            sliders.posY.value = 0;
+            sliders.posZ.value = 0;
+            sliders.pushBack.value = 0.40;
+            sliders.scaleX.dispatchEvent(new Event('input'));
+            sliders.scaleY.dispatchEvent(new Event('input'));
+            sliders.scaleZ.dispatchEvent(new Event('input'));
+            sliders.posX.dispatchEvent(new Event('input'));
+            sliders.posY.dispatchEvent(new Event('input'));
+            sliders.posZ.dispatchEvent(new Event('input'));
+            sliders.pushBack.dispatchEvent(new Event('input'));
+        });
+        
+        document.getElementById('copyValuesBtn').addEventListener('click', () => {
+            const text = `scaleMultiplierX: ${this.debugParams.scaleMultiplierX}
+scaleMultiplierY: ${this.debugParams.scaleMultiplierY}
+scaleMultiplierZ: ${this.debugParams.scaleMultiplierZ}
+posOffsetX: ${this.debugParams.posOffsetX}
+posOffsetY: ${this.debugParams.posOffsetY}
+posOffsetZ: ${this.debugParams.posOffsetZ}
+pushBackFactor: ${this.debugParams.pushBackFactor}`;
+            navigator.clipboard.writeText(text);
+            alert('Values copied to clipboard!');
+        });
+    }
+    
+    updateHeadTransform() {
+        if (!this.headModel || !this.faceData) return;
+        
+        const { faceWidth, faceHeight, faceCenter, headBox } = this.faceData;
+        
+        // Reset head
+        this.headModel.scale.set(1, 1, 1);
+        this.headModel.rotation.set(0, 0, 0);
+        this.headModel.position.set(0, 0, 0);
+        this.headModel.updateMatrixWorld(true);
+        
+        const resetHeadBox = new THREE.Box3().setFromObject(this.headModel);
+        const headWidth = resetHeadBox.max.x - resetHeadBox.min.x;
+        const headHeight = resetHeadBox.max.y - resetHeadBox.min.y;
+        
+        const targetHeadWidth = faceWidth * this.debugParams.scaleMultiplierX;
+        const targetHeadHeight = faceHeight * this.debugParams.scaleMultiplierY;
+        
+        const scaleX = targetHeadWidth / headWidth;
+        const scaleY = targetHeadHeight / headHeight;
+        const scaleZ = Math.max(scaleX, scaleY) * (this.debugParams.scaleMultiplierZ / this.debugParams.scaleMultiplierY);
+        
+        this.headModel.scale.set(scaleX, scaleY, scaleZ);
+        this.headModel.updateMatrixWorld(true);
+        
+        const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
+        const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
+        const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
+        
+        const offsetX = faceCenter.x - scaledHeadCenter.x + this.debugParams.posOffsetX;
+        const offsetY = faceCenter.y - scaledHeadCenter.y + this.debugParams.posOffsetY;
+        let targetZ = faceCenter.z - scaledHeadCenter.z;
+        const pushBack = scaledHeadDepth * this.debugParams.pushBackFactor;
+        const offsetZ = targetZ - pushBack + this.debugParams.posOffsetZ;
+        
+        this.headModel.position.set(offsetX, offsetY, offsetZ);
+        
+        this.updateDebugDisplay();
+    }
+    
+    updateDebugDisplay() {
+        const debugValues = document.getElementById('debugValues');
+        debugValues.textContent = `Current Values:
+{
+  scaleMultiplierX: ${this.debugParams.scaleMultiplierX},
+  scaleMultiplierY: ${this.debugParams.scaleMultiplierY},
+  scaleMultiplierZ: ${this.debugParams.scaleMultiplierZ},
+  posOffsetX: ${this.debugParams.posOffsetX},
+  posOffsetY: ${this.debugParams.posOffsetY},
+  posOffsetZ: ${this.debugParams.posOffsetZ},
+  pushBackFactor: ${this.debugParams.pushBackFactor}
+}`;
     }
     
     initEventListeners() {
@@ -192,60 +340,19 @@ class FaceToBlendshape3D {
             if (oldMesh) this.scene.remove(oldMesh);
             this.faceMesh.name = 'faceMesh';
             this.scene.add(this.faceMesh);
-
-            // 🔥 1. ZWĘŻENIE TWARZY
-            this.faceMesh.scale.x = 0.93; 
-            this.faceMesh.updateMatrixWorld(true);
             
             if (this.headModel) {
-                console.log('[DEBUG] Fitting head model...');
                 this.headModel.visible = true;
-                
-                // 🔥 2. OBLICZANIE SKALI
                 this.faceMesh.geometry.computeBoundingBox();
                 const faceBox = this.faceMesh.geometry.boundingBox;
-                const faceWidth = (faceBox.max.x - faceBox.min.x) * this.faceMesh.scale.x;
-                const faceHeight = (faceBox.max.y - faceBox.min.y) * this.faceMesh.scale.y;
+                const faceWidth = faceBox.max.x - faceBox.min.x;
+                const faceHeight = faceBox.max.y - faceBox.min.y;
                 const faceCenter = faceBox.getCenter(new THREE.Vector3());
                 
-                this.headModel.scale.set(1, 1, 1);
-                this.headModel.rotation.set(0, 0, 0);
-                this.headModel.position.set(0,0,0);
-                this.headModel.updateMatrixWorld(true);
-                
                 const headBox = new THREE.Box3().setFromObject(this.headModel);
-                const headWidth = headBox.max.x - headBox.min.x;
-                const headHeight = headBox.max.y - headBox.min.y;
                 
-                const scaleX = (faceWidth * 2.15) / headWidth;
-                const scaleY = (faceHeight * 1.5) / headHeight;
-                const uniformScale = Math.max(scaleX, scaleY);
+                this.faceData = { faceWidth, faceHeight, faceCenter, headBox };
                 
-                this.headModel.scale.set(uniformScale, uniformScale, uniformScale);
-                this.headModel.updateMatrixWorld(true);
-                
-                // 🔥 3. POZYCJONOWANIE (POPRAWKA: MNIEJSZE COFNIĘCIE)
-                const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
-                const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
-                const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
-                
-                // Centrujemy głowę względem twarzy w X
-                const offsetX = faceCenter.x - scaledHeadCenter.x;
-                
-                // W osi Y: Podnosimy głowę lekko do góry
-                const offsetY = (faceCenter.y - scaledHeadCenter.y) + (faceHeight * 0.12); 
-                
-                // W osi Z: COFNIĘCIE O 55% GŁĘBOKOŚCI
-                const pushBack = scaledHeadDepth * 0.55; 
-                const offsetZ = faceCenter.z - scaledHeadCenter.z - pushBack;
-                
-                this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
-
-                // Dodatkowa korekta rotacji
-                this.headModel.rotation.x = 0.05; 
-                this.headModel.updateMatrixWorld(true);
-                
-                // Koloryzacja głowy
                 const skinColor = this.faceMesh.userData.skinColor;
                 if (skinColor) {
                     this.headModel.traverse((child) => {
@@ -255,10 +362,12 @@ class FaceToBlendshape3D {
                             const b = Math.max(skinColor.b * 1.2, 0.3);
                             child.material.color.setRGB(r, g, b);
                             child.material.emissive.setRGB(r * 0.3, g * 0.3, b * 0.3);
+                            child.material.needsUpdate = true;
                         }
                     });
                 }
                 
+                this.updateHeadTransform();
                 this.faceMesh.renderOrder = 2;
                 this.headModel.renderOrder = 1;
             }
