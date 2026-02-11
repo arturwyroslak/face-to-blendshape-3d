@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { FACEMESH_TESSELATION } from './face-mesh-triangulation.js';
-import { HeadGeometryGenerator } from './head-geometry-generator.js';
 
 const MORPH_TARGET_NAMES = [
     'eyeBlinkLeft', 'eyeBlinkRight', 'eyeLookUpLeft', 'eyeLookUpRight',
@@ -21,7 +20,6 @@ export class FaceMeshGenerator {
         this.geometry = null;
         this.material = null;
         this.mesh = null;
-        this.headGenerator = new HeadGeometryGenerator();
     }
     
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
@@ -49,14 +47,9 @@ export class FaceMeshGenerator {
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
         const correctedScaleX = scaleX * 1.08;  // 8% narrower
+        const scaleZ = Math.max(scaleX, scaleY) * 3.0; // Flattened depth
         
-        // Z Depth Correction:
-        // We DIVIDE by scaleZ. To reduce depth (make it flatter), we need a LARGER scaleZ.
-        // MediaPipe Z values are small, so we need a large divisor to keep them contained.
-        // Increasing from 1.0 to 3.0 to significantly flatten the face.
-        const scaleZ = Math.max(scaleX, scaleY) * 3.0; 
-        
-        // Calculate texture crop bounds (same as TextureMapper)
+        // Calculate texture crop bounds
         const padding = 0.2;
         const faceWidth = maxX - minX;
         const faceHeight = maxY - minY;
@@ -66,48 +59,36 @@ export class FaceMeshGenerator {
         const textureMinX = textureCenterX - cropSize / 2;
         const textureMinY = textureCenterY - cropSize / 2;
         
-        // Sample skin color
-        const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
-        
-        // Generate complete head
-        const headData = this.headGenerator.generateCompleteHead(
-            landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
-        );
-        
-        // Update back colors
-        const faceVertexCount = landmarks.length;
-        for (let i = faceVertexCount * 3; i < headData.colors.length; i += 3) {
-            headData.colors[i] = sampledSkinColor.r;
-            headData.colors[i + 1] = sampledSkinColor.g;
-            headData.colors[i + 2] = sampledSkinColor.b;
-        }
-        
-        // Create UVs normalized to texture crop region (matching TextureMapper)
+        // Generate ONLY face vertices
+        const vertices = [];
+        const colors = [];
         const uvs = [];
+        
         landmarks.forEach(landmark => {
-            // Normalize landmark position to texture crop region
+            // Position
+            const x = (landmark.x - centerX) / correctedScaleX * 2;
+            const y = -(landmark.y - centerY) / scaleY * 2;
+            const z = -((landmark.z - centerZ) / scaleZ * 2);
+            vertices.push(x, y, z);
+            
+            // Color (white for texture)
+            colors.push(1, 1, 1);
+            
+            // UV
             const u = (landmark.x - textureMinX) / cropSize;
-            const v = 1.0 - (landmark.y - textureMinY) / cropSize;  // Flip Y
+            const v = 1.0 - (landmark.y - textureMinY) / cropSize;
             uvs.push(u, v);
         });
         
-        // Back vertices dummy UVs
-        const backVertexCount = headData.vertices.length / 3 - landmarks.length;
-        for (let i = 0; i < backVertexCount; i++) {
-            uvs.push(0, 0);
-        }
-        
-        this.baseVertices = Float32Array.from(headData.vertices);
+        this.baseVertices = Float32Array.from(vertices);
         
         // Set attributes
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(headData.vertices, 3));
+        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
         this.geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-        this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(headData.colors, 3));
+        this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         
-        // Triangulation - face + back
+        // Triangulation - ONLY face
         const indices = [];
-        
-        // Face triangulation
         for (let i = 0; i < FACEMESH_TESSELATION.length; i += 3) {
             indices.push(
                 FACEMESH_TESSELATION[i],
@@ -116,14 +97,11 @@ export class FaceMeshGenerator {
             );
         }
         
-        // Back triangulation
-        headData.backTriangulation.forEach(idx => indices.push(idx));
-        
         this.geometry.setIndex(indices);
         this.geometry.computeVertexNormals();
         
-        // Morph targets with corrected width
-        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, correctedScaleX, scaleY, scaleZ, headData.vertices.length / 3);
+        // Morph targets
+        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, correctedScaleX, scaleY, scaleZ);
         
         // Texture
         const texture = new THREE.CanvasTexture(textureCanvas);
@@ -132,18 +110,26 @@ export class FaceMeshGenerator {
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
         
-        // Material with vertex colors for back
+        // Material
         this.material = new THREE.MeshStandardMaterial({
             map: texture,
             vertexColors: true,
             roughness: 0.7,
             metalness: 0.0,
-            side: THREE.FrontSide
+            side: THREE.FrontSide,
+            transparent: true, // Enable transparency for blending
+            alphaTest: 0.1     // Discard transparent pixels
         });
         
         this.mesh = new THREE.Mesh(this.geometry, this.material);
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
+        
+        // Store dimensions for external scaling
+        this.mesh.userData.faceWidth = 2.0; // In normalized space X is roughly -1 to 1 = width 2
+        this.mesh.userData.faceHeight = 2.0; // In normalized space Y is roughly -1 to 1 = height 2
+        // Actually calculate real aspect ratio
+        this.mesh.userData.aspectRatio = (maxX - minX) / (maxY - minY);
         
         // Apply blendshapes
         Object.entries(blendshapes).forEach(([name, value], index) => {
@@ -159,45 +145,13 @@ export class FaceMeshGenerator {
         return this.mesh;
     }
     
-    sampleSkinColorFromTexture(textureCanvas) {
-        const ctx = textureCanvas.getContext('2d');
-        const width = textureCanvas.width;
-        const height = textureCanvas.height;
-        
-        const sampleX = Math.floor(width * 0.35);
-        const sampleY = Math.floor(height * 0.45);
-        const sampleSize = 30;
-        
-        try {
-            const imageData = ctx.getImageData(sampleX, sampleY, sampleSize, sampleSize);
-            const data = imageData.data;
-            
-            let r = 0, g = 0, b = 0, count = 0;
-            
-            for (let i = 0; i < data.length; i += 4) {
-                r += data[i];
-                g += data[i + 1];
-                b += data[i + 2];
-                count++;
-            }
-            
-            return {
-                r: (r / count) / 255,
-                g: (g / count) / 255,
-                b: (b / count) / 255
-            };
-        } catch (e) {
-            return { r: 0.92, g: 0.82, b: 0.72 };
-        }
-    }
-    
-    createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount) {
+    createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
         const morphTargets = [];
         const morphTargetNames = [];
         
         MORPH_TARGET_NAMES.forEach(blendshapeName => {
             const morphPositions = this.calculateMorphTarget(
-                landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount
+                landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
             );
             
             morphTargets.push({ name: blendshapeName, vertices: morphPositions });
@@ -213,12 +167,11 @@ export class FaceMeshGenerator {
         this.geometry.userData.targetNames = morphTargetNames;
     }
     
-    calculateMorphTarget(landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount) {
+    calculateMorphTarget(landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
         const vertices = [];
         const multiplier = 0.1;
         
         landmarks.forEach((landmark, index) => {
-            // Use correctedScaleX for X, scaleY for Y
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
             let z = -((landmark.z - centerZ) / scaleZ * 2);
@@ -237,17 +190,6 @@ export class FaceMeshGenerator {
             
             vertices.push(x, y, z);
         });
-        
-        // Back vertices don't morph
-        const backVertexCount = totalVertexCount - landmarks.length;
-        for (let i = 0; i < backVertexCount; i++) {
-            const baseIdx = (landmarks.length + i) * 3;
-            vertices.push(
-                this.baseVertices[baseIdx],
-                this.baseVertices[baseIdx + 1],
-                this.baseVertices[baseIdx + 2]
-            );
-        }
         
         return Float32Array.from(vertices);
     }
