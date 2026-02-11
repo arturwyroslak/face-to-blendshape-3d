@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FACEMESH_TESSELATION } from './face-mesh-triangulation.js';
+import { HeadGeometryGenerator } from './head-geometry-generator.js';
 
 /**
  * Face Mesh Generator
@@ -26,14 +27,12 @@ export class FaceMeshGenerator {
         this.geometry = null;
         this.material = null;
         this.mesh = null;
+        this.headGenerator = new HeadGeometryGenerator();
     }
     
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
         // Create base geometry
         this.geometry = new THREE.BufferGeometry();
-        
-        const vertices = [];
-        const uvs = [];
         
         // Calculate bounds for proper scaling
         let minX = Infinity, maxX = -Infinity;
@@ -54,38 +53,66 @@ export class FaceMeshGenerator {
         const centerZ = (minZ + maxZ) / 2;
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
-        const scaleZ = Math.max(scaleX, scaleY) * 2; // Depth scale
+        const scaleZ = Math.max(scaleX, scaleY) * 2;
         
-        // Convert landmarks to 3D vertices with proper scaling
+        // Generate complete head geometry
+        const headData = this.headGenerator.generateCompleteHead(
+            landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
+        );
+        
+        // Add top center vertex
+        const skinColor = { r: 0.95, g: 0.85, b: 0.75 };
+        const topVertex = this.headGenerator.addTopCenterVertex(
+            landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, skinColor
+        );
+        headData.vertices.push(topVertex.x, topVertex.y, topVertex.z);
+        headData.colors.push(topVertex.r, topVertex.g, topVertex.b);
+        
+        // Sample skin color from texture
+        const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
+        
+        // Update vertex colors with sampled skin color
+        const faceVertexCount = landmarks.length;
+        for (let i = faceVertexCount * 3; i < headData.colors.length; i += 3) {
+            headData.colors[i] = sampledSkinColor.r;
+            headData.colors[i + 1] = sampledSkinColor.g;
+            headData.colors[i + 2] = sampledSkinColor.b;
+        }
+        
+        // Create UVs
+        const uvs = [];
         landmarks.forEach(landmark => {
-            // Normalize and center coordinates
-            const x = (landmark.x - centerX) / scaleX * 2;
-            const y = -(landmark.y - centerY) / scaleY * 2; // Flip Y
-            const z = -((landmark.z - centerZ) / scaleZ * 2); // Flip Z to face forward
-            
-            vertices.push(x, y, z);
-            
-            // UV coordinates - direct mapping from normalized image coordinates
             uvs.push(landmark.x, 1.0 - landmark.y);
         });
         
-        // Store base vertices
-        this.baseVertices = Float32Array.from(vertices);
+        // Back vertices have no texture
+        const backVertexCount = headData.vertices.length / 3 - landmarks.length;
+        for (let i = 0; i < backVertexCount; i++) {
+            uvs.push(0, 0); // Dummy UVs
+        }
         
-        // Create faces using official MediaPipe triangulation
-        // REVERSE winding order to fix face normals
+        // Store base vertices
+        this.baseVertices = Float32Array.from(headData.vertices);
+        
+        // Combine face and back triangulation
         const indices = [];
+        
+        // Face triangulation (with reversed winding)
         for (let i = 0; i < FACEMESH_TESSELATION.length; i += 3) {
             indices.push(
                 FACEMESH_TESSELATION[i],
-                FACEMESH_TESSELATION[i + 2], // Swapped
-                FACEMESH_TESSELATION[i + 1]  // Swapped
+                FACEMESH_TESSELATION[i + 2],
+                FACEMESH_TESSELATION[i + 1]
             );
         }
         
+        // Back triangulation
+        headData.backTriangulation.forEach(idx => indices.push(idx));
+        
         // Set geometry attributes
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(headData.vertices, 3));
         this.geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(headData.colors, 3));
         this.geometry.setIndex(indices);
         this.geometry.computeVertexNormals();
         
@@ -99,12 +126,13 @@ export class FaceMeshGenerator {
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
         
-        // Create material with texture
+        // Create material with texture AND vertex colors
         this.material = new THREE.MeshStandardMaterial({
             map: texture,
+            vertexColors: true, // Enable vertex colors for back of head
             roughness: 0.7,
             metalness: 0.0,
-            side: THREE.FrontSide, // Only render front faces
+            side: THREE.FrontSide,
             flatShading: false,
             transparent: false
         });
@@ -127,6 +155,43 @@ export class FaceMeshGenerator {
         }
         
         return this.mesh;
+    }
+    
+    /**
+     * Sample average skin color from texture (cheek area)
+     */
+    sampleSkinColorFromTexture(textureCanvas) {
+        const ctx = textureCanvas.getContext('2d');
+        const width = textureCanvas.width;
+        const height = textureCanvas.height;
+        
+        // Sample from cheek area (approximate)
+        const sampleX = Math.floor(width * 0.3);
+        const sampleY = Math.floor(height * 0.4);
+        const sampleSize = 20;
+        
+        try {
+            const imageData = ctx.getImageData(sampleX, sampleY, sampleSize, sampleSize);
+            const data = imageData.data;
+            
+            let r = 0, g = 0, b = 0, count = 0;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i];
+                g += data[i + 1];
+                b += data[i + 2];
+                count++;
+            }
+            
+            return {
+                r: (r / count) / 255,
+                g: (g / count) / 255,
+                b: (b / count) / 255
+            };
+        } catch (e) {
+            // Fallback skin color
+            return { r: 0.95, g: 0.85, b: 0.75 };
+        }
     }
     
     createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
@@ -169,96 +234,79 @@ export class FaceMeshGenerator {
     
     calculateMorphTarget(landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
         const vertices = [];
-        const multiplier = 0.1; // Deformation intensity
+        const multiplier = 0.1;
         
         landmarks.forEach((landmark, index) => {
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
-            let z = -((landmark.z - centerZ) / scaleZ * 2); // Flip Z
+            let z = -((landmark.z - centerZ) / scaleZ * 2);
             
             // Apply deformations based on blendshape type
             switch(blendshapeName) {
                 case 'jawOpen':
-                    if (y < 0) y -= multiplier * 0.5; // Lower jaw
+                    if (y < 0) y -= multiplier * 0.5;
                     break;
-                    
                 case 'mouthSmileLeft':
                     if (index === 61 || index === 62 || index === 308) y += multiplier * 0.3;
                     break;
-                    
                 case 'mouthSmileRight':
                     if (index === 291 || index === 292 || index === 78) y += multiplier * 0.3;
                     break;
-                    
                 case 'eyeBlinkLeft':
                     if (index >= 33 && index <= 133) y -= multiplier * 0.2;
                     break;
-                    
                 case 'eyeBlinkRight':
                     if (index >= 362 && index <= 398) y -= multiplier * 0.2;
                     break;
-                    
                 case 'browInnerUp':
                     if (index === 107 || index === 336) y += multiplier * 0.4;
                     break;
-                    
                 case 'browOuterUpLeft':
                     if (index === 70 || index === 46 || index === 63) y += multiplier * 0.4;
                     break;
-                    
                 case 'browOuterUpRight':
                     if (index === 300 || index === 276 || index === 293) y += multiplier * 0.4;
                     break;
-                    
                 case 'mouthFunnel':
                     if ([0, 17, 61, 291].includes(index)) {
-                        z += multiplier * 0.3; // Forward (was backward)
+                        z += multiplier * 0.3;
                         x *= 0.8;
                         y *= 0.9;
                     }
                     break;
-                    
                 case 'mouthPucker':
                     if ([61, 291, 0, 17, 78, 308].includes(index)) {
-                        z -= multiplier * 0.3; // Backward (was forward)
+                        z -= multiplier * 0.3;
                         x *= 0.7;
                     }
                     break;
-                    
                 case 'cheekPuff':
                     if ([118, 347, 425, 205, 36, 266].includes(index)) {
                         x *= 1.15;
-                        z -= multiplier * 0.2; // Inward
+                        z -= multiplier * 0.2;
                     }
                     break;
-                    
                 case 'noseSneerLeft':
                     if ([219, 49, 129].includes(index)) y += multiplier * 0.15;
                     break;
-                    
                 case 'noseSneerRight':
                     if ([439, 279, 358].includes(index)) y += multiplier * 0.15;
                     break;
-                    
                 case 'jawForward':
-                    if (y < -0.2) z -= multiplier * 0.4; // Forward
+                    if (y < -0.2) z -= multiplier * 0.4;
                     break;
-                    
                 case 'jawLeft':
                     if (y < -0.1) x -= multiplier * 0.3;
                     break;
-                    
                 case 'jawRight':
                     if (y < -0.1) x += multiplier * 0.3;
                     break;
-                    
                 case 'eyeLookUpLeft':
                 case 'eyeLookUpRight':
                     if ((index >= 33 && index <= 133) || (index >= 362 && index <= 398)) {
                         y += multiplier * 0.08;
                     }
                     break;
-                    
                 case 'eyeLookDownLeft':
                 case 'eyeLookDownRight':
                     if ((index >= 33 && index <= 133) || (index >= 362 && index <= 398)) {
