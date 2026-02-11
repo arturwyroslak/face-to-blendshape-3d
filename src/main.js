@@ -30,6 +30,9 @@ class FaceToBlendshape3D {
                 posOffsetX: 0,
                 posOffsetY: 0,
                 posOffsetZ: 0,
+                rotationX: 0,
+                rotationY: 0,
+                rotationZ: 0,
                 pushBackFactor: 0.40
             },
             face: {
@@ -38,7 +41,10 @@ class FaceToBlendshape3D {
                 scaleZ: 1.0,
                 posOffsetX: 0,
                 posOffsetY: 0,
-                posOffsetZ: 0
+                posOffsetZ: 0,
+                rotationX: 0,
+                rotationY: 0,
+                rotationZ: 0
             }
         };
         
@@ -153,6 +159,9 @@ class FaceToBlendshape3D {
             posX: document.getElementById('headPosXSlider'),
             posY: document.getElementById('headPosYSlider'),
             posZ: document.getElementById('headPosZSlider'),
+            rotX: document.getElementById('headRotXSlider'),
+            rotY: document.getElementById('headRotYSlider'),
+            rotZ: document.getElementById('headRotZSlider'),
             pushBack: document.getElementById('headPushBackSlider')
         };
         
@@ -163,6 +172,9 @@ class FaceToBlendshape3D {
             posX: document.getElementById('headPosXValue'),
             posY: document.getElementById('headPosYValue'),
             posZ: document.getElementById('headPosZValue'),
+            rotX: document.getElementById('headRotXValue'),
+            rotY: document.getElementById('headRotYValue'),
+            rotZ: document.getElementById('headRotZValue'),
             pushBack: document.getElementById('headPushBackValue')
         };
         
@@ -173,7 +185,10 @@ class FaceToBlendshape3D {
             scaleZ: document.getElementById('faceScaleZSlider'),
             posX: document.getElementById('facePosXSlider'),
             posY: document.getElementById('facePosYSlider'),
-            posZ: document.getElementById('facePosZSlider')
+            posZ: document.getElementById('facePosZSlider'),
+            rotX: document.getElementById('faceRotXSlider'),
+            rotY: document.getElementById('faceRotYSlider'),
+            rotZ: document.getElementById('faceRotZSlider')
         };
         
         const faceValues = {
@@ -182,120 +197,49 @@ class FaceToBlendshape3D {
             scaleZ: document.getElementById('faceScaleZValue'),
             posX: document.getElementById('facePosXValue'),
             posY: document.getElementById('facePosYValue'),
-            posZ: document.getElementById('facePosZValue')
+            posZ: document.getElementById('facePosZValue'),
+            rotX: document.getElementById('faceRotXValue'),
+            rotY: document.getElementById('faceRotYValue'),
+            rotZ: document.getElementById('faceRotZValue')
         };
         
         // Head slider listeners
-        headSliders.scaleX.addEventListener('input', (e) => {
-            this.debugParams.head.scaleMultiplierX = parseFloat(e.target.value);
-            headValues.scaleX.textContent = e.target.value;
-            this.updateHeadTransform();
-        });
-        
-        headSliders.scaleY.addEventListener('input', (e) => {
-            this.debugParams.head.scaleMultiplierY = parseFloat(e.target.value);
-            headValues.scaleY.textContent = e.target.value;
-            this.updateHeadTransform();
-        });
-        
-        headSliders.scaleZ.addEventListener('input', (e) => {
-            this.debugParams.head.scaleMultiplierZ = parseFloat(e.target.value);
-            headValues.scaleZ.textContent = e.target.value;
-            this.updateHeadTransform();
-        });
-        
-        headSliders.posX.addEventListener('input', (e) => {
-            this.debugParams.head.posOffsetX = parseFloat(e.target.value);
-            headValues.posX.textContent = e.target.value;
-            this.updateHeadTransform();
-        });
-        
-        headSliders.posY.addEventListener('input', (e) => {
-            this.debugParams.head.posOffsetY = parseFloat(e.target.value);
-            headValues.posY.textContent = e.target.value;
-            this.updateHeadTransform();
-        });
-        
-        headSliders.posZ.addEventListener('input', (e) => {
-            this.debugParams.head.posOffsetZ = parseFloat(e.target.value);
-            headValues.posZ.textContent = e.target.value;
-            this.updateHeadTransform();
-        });
-        
-        headSliders.pushBack.addEventListener('input', (e) => {
-            this.debugParams.head.pushBackFactor = parseFloat(e.target.value);
-            headValues.pushBack.textContent = e.target.value;
-            this.updateHeadTransform();
-        });
+        headSliders.scaleX.addEventListener('input', (e) => { this.debugParams.head.scaleMultiplierX = parseFloat(e.target.value); headValues.scaleX.textContent = e.target.value; this.updateHeadTransform(); });
+        headSliders.scaleY.addEventListener('input', (e) => { this.debugParams.head.scaleMultiplierY = parseFloat(e.target.value); headValues.scaleY.textContent = e.target.value; this.updateHeadTransform(); });
+        headSliders.scaleZ.addEventListener('input', (e) => { this.debugParams.head.scaleMultiplierZ = parseFloat(e.target.value); headValues.scaleZ.textContent = e.target.value; this.updateHeadTransform(); });
+        headSliders.posX.addEventListener('input', (e) => { this.debugParams.head.posOffsetX = parseFloat(e.target.value); headValues.posX.textContent = e.target.value; this.updateHeadTransform(); });
+        headSliders.posY.addEventListener('input', (e) => { this.debugParams.head.posOffsetY = parseFloat(e.target.value); headValues.posY.textContent = e.target.value; this.updateHeadTransform(); });
+        headSliders.posZ.addEventListener('input', (e) => { this.debugParams.head.posOffsetZ = parseFloat(e.target.value); headValues.posZ.textContent = e.target.value; this.updateHeadTransform(); });
+        headSliders.rotX.addEventListener('input', (e) => { this.debugParams.head.rotationX = parseFloat(e.target.value); headValues.rotX.textContent = e.target.value + '°'; this.updateHeadTransform(); });
+        headSliders.rotY.addEventListener('input', (e) => { this.debugParams.head.rotationY = parseFloat(e.target.value); headValues.rotY.textContent = e.target.value + '°'; this.updateHeadTransform(); });
+        headSliders.rotZ.addEventListener('input', (e) => { this.debugParams.head.rotationZ = parseFloat(e.target.value); headValues.rotZ.textContent = e.target.value + '°'; this.updateHeadTransform(); });
+        headSliders.pushBack.addEventListener('input', (e) => { this.debugParams.head.pushBackFactor = parseFloat(e.target.value); headValues.pushBack.textContent = e.target.value; this.updateHeadTransform(); });
         
         // Face slider listeners
-        faceSliders.scaleX.addEventListener('input', (e) => {
-            this.debugParams.face.scaleX = parseFloat(e.target.value);
-            faceValues.scaleX.textContent = e.target.value;
-            this.updateFaceTransform();
-        });
-        
-        faceSliders.scaleY.addEventListener('input', (e) => {
-            this.debugParams.face.scaleY = parseFloat(e.target.value);
-            faceValues.scaleY.textContent = e.target.value;
-            this.updateFaceTransform();
-        });
-        
-        faceSliders.scaleZ.addEventListener('input', (e) => {
-            this.debugParams.face.scaleZ = parseFloat(e.target.value);
-            faceValues.scaleZ.textContent = e.target.value;
-            this.updateFaceTransform();
-        });
-        
-        faceSliders.posX.addEventListener('input', (e) => {
-            this.debugParams.face.posOffsetX = parseFloat(e.target.value);
-            faceValues.posX.textContent = e.target.value;
-            this.updateFaceTransform();
-        });
-        
-        faceSliders.posY.addEventListener('input', (e) => {
-            this.debugParams.face.posOffsetY = parseFloat(e.target.value);
-            faceValues.posY.textContent = e.target.value;
-            this.updateFaceTransform();
-        });
-        
-        faceSliders.posZ.addEventListener('input', (e) => {
-            this.debugParams.face.posOffsetZ = parseFloat(e.target.value);
-            faceValues.posZ.textContent = e.target.value;
-            this.updateFaceTransform();
-        });
+        faceSliders.scaleX.addEventListener('input', (e) => { this.debugParams.face.scaleX = parseFloat(e.target.value); faceValues.scaleX.textContent = e.target.value; this.updateFaceTransform(); });
+        faceSliders.scaleY.addEventListener('input', (e) => { this.debugParams.face.scaleY = parseFloat(e.target.value); faceValues.scaleY.textContent = e.target.value; this.updateFaceTransform(); });
+        faceSliders.scaleZ.addEventListener('input', (e) => { this.debugParams.face.scaleZ = parseFloat(e.target.value); faceValues.scaleZ.textContent = e.target.value; this.updateFaceTransform(); });
+        faceSliders.posX.addEventListener('input', (e) => { this.debugParams.face.posOffsetX = parseFloat(e.target.value); faceValues.posX.textContent = e.target.value; this.updateFaceTransform(); });
+        faceSliders.posY.addEventListener('input', (e) => { this.debugParams.face.posOffsetY = parseFloat(e.target.value); faceValues.posY.textContent = e.target.value; this.updateFaceTransform(); });
+        faceSliders.posZ.addEventListener('input', (e) => { this.debugParams.face.posOffsetZ = parseFloat(e.target.value); faceValues.posZ.textContent = e.target.value; this.updateFaceTransform(); });
+        faceSliders.rotX.addEventListener('input', (e) => { this.debugParams.face.rotationX = parseFloat(e.target.value); faceValues.rotX.textContent = e.target.value + '°'; this.updateFaceTransform(); });
+        faceSliders.rotY.addEventListener('input', (e) => { this.debugParams.face.rotationY = parseFloat(e.target.value); faceValues.rotY.textContent = e.target.value + '°'; this.updateFaceTransform(); });
+        faceSliders.rotZ.addEventListener('input', (e) => { this.debugParams.face.rotationZ = parseFloat(e.target.value); faceValues.rotZ.textContent = e.target.value + '°'; this.updateFaceTransform(); });
         
         // Reset button
         document.getElementById('resetDebugBtn').addEventListener('click', () => {
             // Reset head
-            headSliders.scaleX.value = 1.15;
-            headSliders.scaleY.value = 1.45;
-            headSliders.scaleZ.value = 1.45;
-            headSliders.posX.value = 0;
-            headSliders.posY.value = 0;
-            headSliders.posZ.value = 0;
+            headSliders.scaleX.value = 1.15; headSliders.scaleY.value = 1.45; headSliders.scaleZ.value = 1.45;
+            headSliders.posX.value = 0; headSliders.posY.value = 0; headSliders.posZ.value = 0;
+            headSliders.rotX.value = 0; headSliders.rotY.value = 0; headSliders.rotZ.value = 0;
             headSliders.pushBack.value = 0.40;
             // Reset face
-            faceSliders.scaleX.value = 1.0;
-            faceSliders.scaleY.value = 1.0;
-            faceSliders.scaleZ.value = 1.0;
-            faceSliders.posX.value = 0;
-            faceSliders.posY.value = 0;
-            faceSliders.posZ.value = 0;
+            faceSliders.scaleX.value = 1.0; faceSliders.scaleY.value = 1.0; faceSliders.scaleZ.value = 1.0;
+            faceSliders.posX.value = 0; faceSliders.posY.value = 0; faceSliders.posZ.value = 0;
+            faceSliders.rotX.value = 0; faceSliders.rotY.value = 0; faceSliders.rotZ.value = 0;
             // Trigger updates
-            headSliders.scaleX.dispatchEvent(new Event('input'));
-            headSliders.scaleY.dispatchEvent(new Event('input'));
-            headSliders.scaleZ.dispatchEvent(new Event('input'));
-            headSliders.posX.dispatchEvent(new Event('input'));
-            headSliders.posY.dispatchEvent(new Event('input'));
-            headSliders.posZ.dispatchEvent(new Event('input'));
-            headSliders.pushBack.dispatchEvent(new Event('input'));
-            faceSliders.scaleX.dispatchEvent(new Event('input'));
-            faceSliders.scaleY.dispatchEvent(new Event('input'));
-            faceSliders.scaleZ.dispatchEvent(new Event('input'));
-            faceSliders.posX.dispatchEvent(new Event('input'));
-            faceSliders.posY.dispatchEvent(new Event('input'));
-            faceSliders.posZ.dispatchEvent(new Event('input'));
+            Object.values(headSliders).forEach(s => s.dispatchEvent(new Event('input')));
+            Object.values(faceSliders).forEach(s => s.dispatchEvent(new Event('input')));
         });
         
         // Copy button
@@ -307,6 +251,9 @@ scaleMultiplierZ: ${this.debugParams.head.scaleMultiplierZ}
 posOffsetX: ${this.debugParams.head.posOffsetX}
 posOffsetY: ${this.debugParams.head.posOffsetY}
 posOffsetZ: ${this.debugParams.head.posOffsetZ}
+rotationX: ${this.debugParams.head.rotationX}
+rotationY: ${this.debugParams.head.rotationY}
+rotationZ: ${this.debugParams.head.rotationZ}
 pushBackFactor: ${this.debugParams.head.pushBackFactor}
 
 FACE:
@@ -315,7 +262,10 @@ scaleY: ${this.debugParams.face.scaleY}
 scaleZ: ${this.debugParams.face.scaleZ}
 posOffsetX: ${this.debugParams.face.posOffsetX}
 posOffsetY: ${this.debugParams.face.posOffsetY}
-posOffsetZ: ${this.debugParams.face.posOffsetZ}`;
+posOffsetZ: ${this.debugParams.face.posOffsetZ}
+rotationX: ${this.debugParams.face.rotationX}
+rotationY: ${this.debugParams.face.rotationY}
+rotationZ: ${this.debugParams.face.rotationZ}`;
             navigator.clipboard.writeText(text);
             alert('Values copied to clipboard!');
         });
@@ -343,6 +293,14 @@ posOffsetZ: ${this.debugParams.face.posOffsetZ}`;
         const scaleZ = Math.max(scaleX, scaleY) * (this.debugParams.head.scaleMultiplierZ / this.debugParams.head.scaleMultiplierY);
         
         this.headModel.scale.set(scaleX, scaleY, scaleZ);
+        
+        // Apply rotation (degrees to radians)
+        this.headModel.rotation.set(
+            THREE.MathUtils.degToRad(this.debugParams.head.rotationX),
+            THREE.MathUtils.degToRad(this.debugParams.head.rotationY),
+            THREE.MathUtils.degToRad(this.debugParams.head.rotationZ)
+        );
+        
         this.headModel.updateMatrixWorld(true);
         
         const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
@@ -368,6 +326,13 @@ posOffsetZ: ${this.debugParams.face.posOffsetZ}`;
             this.debugParams.face.scaleX,
             this.debugParams.face.scaleY,
             this.debugParams.face.scaleZ
+        );
+        
+        // Apply rotation (degrees to radians)
+        this.faceMesh.rotation.set(
+            THREE.MathUtils.degToRad(this.debugParams.face.rotationX),
+            THREE.MathUtils.degToRad(this.debugParams.face.rotationY),
+            THREE.MathUtils.degToRad(this.debugParams.face.rotationZ)
         );
         
         this.faceMesh.position.set(
@@ -401,6 +366,9 @@ posOffsetZ: ${this.debugParams.face.posOffsetZ}`;
   posOffsetX: ${this.debugParams.head.posOffsetX},
   posOffsetY: ${this.debugParams.head.posOffsetY},
   posOffsetZ: ${this.debugParams.head.posOffsetZ},
+  rotationX: ${this.debugParams.head.rotationX},
+  rotationY: ${this.debugParams.head.rotationY},
+  rotationZ: ${this.debugParams.head.rotationZ},
   pushBackFactor: ${this.debugParams.head.pushBackFactor}
 }
 
@@ -411,7 +379,10 @@ FACE:
   scaleZ: ${this.debugParams.face.scaleZ},
   posOffsetX: ${this.debugParams.face.posOffsetX},
   posOffsetY: ${this.debugParams.face.posOffsetY},
-  posOffsetZ: ${this.debugParams.face.posOffsetZ}
+  posOffsetZ: ${this.debugParams.face.posOffsetZ},
+  rotationX: ${this.debugParams.face.rotationX},
+  rotationY: ${this.debugParams.face.rotationY},
+  rotationZ: ${this.debugParams.face.rotationZ}
 }`;
     }
     
