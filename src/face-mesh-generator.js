@@ -27,10 +27,7 @@ export class FaceMeshGenerator {
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
         this.geometry = new THREE.BufferGeometry();
         
-        const videoWidth = textureCanvas.width;
-        const videoHeight = textureCanvas.height;
-        
-        // Calculate bounds
+        // Calculate bounds for geometry AND UV mapping
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
@@ -51,6 +48,16 @@ export class FaceMeshGenerator {
         const scaleY = maxY - minY;
         const scaleZ = Math.max(scaleX, scaleY) * 2;
         
+        // Calculate texture crop bounds (same as TextureMapper)
+        const padding = 0.2;
+        const faceWidth = maxX - minX;
+        const faceHeight = maxY - minY;
+        const cropSize = Math.max(faceWidth, faceHeight) * (1 + padding);
+        const textureCenterX = centerX;
+        const textureCenterY = centerY;
+        const textureMinX = textureCenterX - cropSize / 2;
+        const textureMinY = textureCenterY - cropSize / 2;
+        
         // Sample skin color
         const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
         
@@ -67,13 +74,12 @@ export class FaceMeshGenerator {
             headData.colors[i + 2] = sampledSkinColor.b;
         }
         
-        // Create UVs by projecting landmarks into texture space (like spite's setVideoUvs)
+        // Create UVs normalized to texture crop region (matching TextureMapper)
         const uvs = [];
         landmarks.forEach(landmark => {
-            // MediaPipe landmarks are normalized [0,1] relative to image dimensions
-            // Convert to texture UV space
-            const u = landmark.x;  // Already normalized
-            const v = 1.0 - landmark.y;  // Flip Y for texture coordinates
+            // Normalize landmark position to texture crop region
+            const u = (landmark.x - textureMinX) / cropSize;
+            const v = 1.0 - (landmark.y - textureMinY) / cropSize;  // Flip Y
             uvs.push(u, v);
         });
         
