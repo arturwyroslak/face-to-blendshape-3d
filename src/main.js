@@ -22,288 +22,346 @@ class FaceToBlendshape3D {
         this.textureCanvas = null;
         this.init();
     }
-
+    
     async init() {
         await this.initMediaPipe();
         this.initThreeJS();
         this.initEventListeners();
         this.animate();
     }
-
+    
     async initMediaPipe() {
-        const vision = await FilesetResolver.forVisionTasks(
-            'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-        );
-
-        this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath:
-                    'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',
-                delegate: 'GPU'
-            },
-            outputFaceBlendshapes: true,
-            outputFacialTransformationMatrixes: true,
-            runningMode: 'IMAGE',
-            numFaces: 1
-        });
+        try {
+            const vision = await FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+            );
+            this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',
+                    delegate: 'GPU'
+                },
+                outputFaceBlendshapes: true,
+                outputFacialTransformationMatrixes: true,
+                runningMode: 'IMAGE',
+                numFaces: 1
+            });
+            this.showStatus('MediaPipe initialized successfully', 'success');
+        } catch (error) {
+            console.error('MediaPipe initialization error:', error);
+            this.showStatus('Failed to initialize MediaPipe: ' + error.message, 'error');
+        }
     }
-
+    
     initThreeJS() {
         const canvas = document.getElementById('canvas3d');
         const container = canvas.parentElement;
-
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0xf8f9ff);
-
-        this.camera = new THREE.PerspectiveCamera(
-            45,
-            container.clientWidth / container.clientHeight,
-            0.1,
-            1000
-        );
+        this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
         this.camera.position.z = 2;
-
-        this.renderer = new THREE.WebGLRenderer({
-            canvas,
-            antialias: true,
-            preserveDrawingBuffer: true
-        });
-
+        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
         this.renderer.setSize(container.clientWidth, container.clientHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
-
+        
+        // Enable shadows
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
         this.controls = new OrbitControls(this.camera, canvas);
         this.controls.enableDamping = true;
-
-        // Oświetlenie
-        const ambient = new THREE.AmbientLight(0xffffff, 0.9);
-        this.scene.add(ambient);
-        const front = new THREE.DirectionalLight(0xffffff, 1.0);
-        front.position.set(0, 0, 5);
-        this.scene.add(front);
-        const top = new THREE.DirectionalLight(0xffffff, 0.8);
-        top.position.set(0, 5, 0);
-        this.scene.add(top);
-
-        // Ładowanie modelu głowy
+        this.controls.dampingFactor = 0.05;
+        
+        // AGGRESSIVE LIGHTING - multiple angles
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.6
+        this.scene.add(ambientLight);
+        
+        const frontLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        frontLight.position.set(0, 0, 5);
+        frontLight.castShadow = false;
+        this.scene.add(frontLight);
+        
+        const topLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        topLight.position.set(0, 5, 0);
+        topLight.castShadow = false;
+        this.scene.add(topLight);
+        
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        backLight.position.set(0, 0, -5);
+        this.scene.add(backLight);
+        
+        const leftLight = new THREE.PointLight(0xffffff, 0.5);
+        leftLight.position.set(-5, 0, 0);
+        this.scene.add(leftLight);
+        
+        const rightLight = new THREE.PointLight(0xffffff, 0.5);
+        rightLight.position.set(5, 0, 0);
+        this.scene.add(rightLight);
+        
         const loader = new GLTFLoader();
+        console.log('[DEBUG] Loading head.glb from:', headModelUrl);
+        
         loader.load(headModelUrl, (gltf) => {
             this.headModel = gltf.scene;
-
-            // Ustawienie materiału dla głowy (baza)
+            console.log('[DEBUG] Head model loaded:', this.headModel);
+            console.log('[DEBUG] Model children:', this.headModel.children);
+            
+            // Deep inspection
             this.headModel.traverse((child) => {
+                console.log('[DEBUG] Child:', child.name, child.type);
                 if (child.isMesh) {
-                    child.material = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(0.85, 0.65, 0.55), // Bardziej naturalny kolor skóry
-                        roughness: 0.5,
-                        metalness: 0.0
+                    console.log('[DEBUG] Mesh material BEFORE:', child.material);
+                    console.log('[DEBUG] Mesh geometry:', child.geometry);
+                    console.log('[DEBUG] Vertex count:', child.geometry.attributes.position?.count);
+                    
+                    // FORCE REPLACE material immediately
+                    const forcedMat = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(0.8, 0.6, 0.5), // Tan/beige
+                        roughness: 0.6,
+                        metalness: 0.0,
+                        emissive: new THREE.Color(0.3, 0.2, 0.15), // Strong emission
+                        emissiveIntensity: 0.4,
+                        side: THREE.FrontSide, // Try FrontSide instead of DoubleSide
+                        flatShading: false
                     });
+                    child.material = forcedMat;
+                    child.castShadow = false;
+                    child.receiveShadow = false;
+                    console.log('[DEBUG] Mesh material AFTER:', child.material);
                 }
             });
-
-            // Wyśrodkowanie modelu głowy względem jego własnego pivotu
+            
             const box = new THREE.Box3().setFromObject(this.headModel);
             const center = box.getCenter(new THREE.Vector3());
             this.headModel.position.sub(center);
-
+            console.log('[DEBUG] Head model centered at:', this.headModel.position);
+            
             this.scene.add(this.headModel);
             this.headModel.visible = false;
+            console.log('[DEBUG] Head model added to scene (hidden)');
+        }, (progress) => {
+            console.log('[DEBUG] Loading progress:', progress.loaded, '/', progress.total);
+        }, (error) => {
+            console.error('[ERROR] Loading head model:', error);
+            this.showStatus('Failed to load head model.', 'error');
         });
-
+        
         window.addEventListener('resize', () => this.onResize());
     }
-
+    
     initEventListeners() {
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const processBtn = document.getElementById('processBtn');
         const exportBtn = document.getElementById('exportBtn');
-
         uploadArea.addEventListener('click', () => fileInput.click());
-
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) this.loadImage(file);
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => { uploadArea.classList.remove('dragover'); });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) this.loadImage(file);
         });
-
+        fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) this.loadImage(file); });
         processBtn.addEventListener('click', () => this.processImage());
         exportBtn.addEventListener('click', () => this.exportGLB());
     }
-
+    
     loadImage(file) {
         const reader = new FileReader();
         reader.onload = (e) => {
+            const preview = document.getElementById('preview');
+            preview.src = e.target.result;
+            preview.style.display = 'block';
             const img = new Image();
             img.onload = () => {
                 this.currentImage = img;
                 document.getElementById('processBtn').disabled = false;
+                this.showStatus('Image loaded. Ready to process.', 'success');
             };
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
     }
-
+    
     async processImage() {
-        if (!this.currentImage) return;
+        if (!this.currentImage || !this.faceLandmarker) return;
+        try {
+            document.getElementById('processBtn').disabled = true;
+            document.getElementById('processBtnText').innerHTML = '<span class="spinner"></span> Processing...';
+            this.showStatus('Detecting face landmarks...', 'loading');
+            const results = this.faceLandmarker.detect(this.currentImage);
+            if (!results.faceLandmarks || results.faceLandmarks.length === 0) throw new Error('No face detected in the image');
+            const landmarks = results.faceLandmarks[0];
+            const blendshapes = results.faceBlendshapes?.[0]?.categories || [];
+            const transformMatrix = results.facialTransformationMatrixes?.[0];
+            const mapper = new ARKitBlendshapeMapper();
+            this.blendshapes = mapper.mapMediaPipeToARKit(blendshapes, landmarks);
+            this.showStatus('Generating face texture...', 'loading');
+            const textureMapper = new TextureMapper();
+            this.textureCanvas = textureMapper.createFaceTexture(this.currentImage, landmarks);
+            this.showStatus('Generating 3D model with morph targets...', 'loading');
+            const meshGenerator = new FaceMeshGenerator();
+            this.faceMesh = meshGenerator.generateWithMorphTargets(landmarks, this.blendshapes, transformMatrix, this.textureCanvas);
+            const oldMesh = this.scene.getObjectByName('faceMesh');
+            if (oldMesh) this.scene.remove(oldMesh);
+            this.faceMesh.name = 'faceMesh';
+            this.scene.add(this.faceMesh);
 
-        const results = this.faceLandmarker.detect(this.currentImage);
-        if (!results.faceLandmarks?.length) return;
-
-        const landmarks = results.faceLandmarks[0];
-        const blendshapes = results.faceBlendshapes?.[0]?.categories || [];
-        const transformMatrix = results.facialTransformationMatrixes?.[0];
-
-        // 1. Generowanie blendshapes i tekstury
-        const mapper = new ARKitBlendshapeMapper();
-        this.blendshapes = mapper.mapMediaPipeToARKit(blendshapes, landmarks);
-
-        const textureMapper = new TextureMapper();
-        this.textureCanvas = textureMapper.createFaceTexture(
-            this.currentImage,
-            landmarks
-        );
-
-        // 2. Generowanie siatki twarzy (maski)
-        const meshGenerator = new FaceMeshGenerator();
-        this.faceMesh = meshGenerator.generateWithMorphTargets(
-            landmarks,
-            this.blendshapes,
-            transformMatrix,
-            this.textureCanvas
-        );
-
-        // Usunięcie starej siatki jeśli istnieje
-        const oldMesh = this.scene.getObjectByName('faceMesh');
-        if (oldMesh) this.scene.remove(oldMesh);
-
-        this.faceMesh.name = 'faceMesh';
-        this.scene.add(this.faceMesh);
-
-        // =========================================================
-        // 🔥 TU SĄ GŁÓWNE ZMIANY DO SKALOWANIA 🔥
-        // =========================================================
-
-        // Krok A: Zwężenie samej maski twarzy (zgodnie z życzeniem)
-        this.faceMesh.scale.x = 0.92; // Lekkie zwężenie
-        this.faceMesh.updateMatrixWorld(true);
-
-        if (this.headModel) {
-            this.headModel.visible = true;
-
-            // 1. Obliczamy wymiary pudełka (Bounding Box) twarzy
-            this.faceMesh.geometry.computeBoundingBox();
-            const faceBox = this.faceMesh.geometry.boundingBox;
-            const faceSize = new THREE.Vector3();
-            faceBox.getSize(faceSize);
-            const faceCenter = new THREE.Vector3();
-            faceBox.getCenter(faceCenter); // Pobieramy środek twarzy
-
-            // Zastosowanie skali obiektu do wymiarów z geometrii
-            const faceWidthWorld = faceSize.x * this.faceMesh.scale.x;
-            const faceHeightWorld = faceSize.y * this.faceMesh.scale.y;
-
-            // 2. Obliczamy wymiary pudełka głowy (nieprzeskalowanej)
-            // Resetujemy skalę głowy na chwilę, żeby pobrać czyste wymiary
-            this.headModel.scale.set(1, 1, 1);
-            this.headModel.updateMatrixWorld(true);
+            // 🔥 1. ZWĘŻENIE TWARZY
+            this.faceMesh.scale.x = 0.93; 
+            this.faceMesh.updateMatrixWorld(true);
             
-            const headBox = new THREE.Box3().setFromObject(this.headModel);
-            const headSize = new THREE.Vector3();
-            headBox.getSize(headSize);
-
-            // 3. Obliczamy potrzebną skalę
-            // Chcemy, żeby głowa była znacznie szersza niż sama maska twarzy (np. 2.2 razy szersza),
-            // ponieważ maska to tylko przód, a głowa musi obejmować całość.
-            // Poprzednio ten mnożnik był za mały (1.15), dlatego głowa była malutka.
-            const widthRatio = (faceWidthWorld * 2.3) / headSize.x;
-            const heightRatio = (faceHeightWorld * 1.5) / headSize.y; // Mniejszy mnożnik na wysokość
-
-            // Wybieramy większą skalę, żeby głowa nie była za mała w żadnym wymiarze
-            const targetScale = Math.max(widthRatio, heightRatio);
-
-            console.log("Skala głowy:", targetScale); // Debug
-
-            this.headModel.scale.set(targetScale, targetScale, targetScale);
-            this.headModel.updateMatrixWorld(true);
-
-            // 4. Pozycjonowanie
-            // Ustawiamy głowę w centrum twarzy
-            const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
-            const scaledHeadCenter = new THREE.Vector3();
-            scaledHeadBox.getCenter(scaledHeadCenter);
-
-            const offset = new THREE.Vector3().subVectors(faceCenter, scaledHeadCenter);
-            this.headModel.position.add(offset);
-
-            // 5. Korekta głębokości (Z) - kluczowe dla wtapiania
-            // Przesuwamy głowę w tył względem twarzy, ale nie za daleko.
-            // Im mniejsza wartość odejmowana, tym głowa jest "bliżej" przodu twarzy.
-            const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
-            
-            // Przesuwamy głowę tak, żeby jej środek był nieco za twarzą.
-            // Wartość 0.15 jest eksperymentalna - reguluje jak bardzo uszy/tył głowy wystają.
-            this.headModel.position.z += scaledHeadDepth * 0.15; 
-
-            // Upewniamy się, że twarz jest zawsze przed głową w kolejności renderowania
-            this.faceMesh.renderOrder = 2;
-            this.headModel.renderOrder = 1;
-
-            // Opcjonalnie: Próbujemy dopasować kolor głowy do średniego koloru twarzy
-            // (Jeśli w faceMesh.userData zapisałeś kolor skóry w generatorze)
-            if (this.faceMesh.userData.skinColor) {
-                 const sc = this.faceMesh.userData.skinColor;
-                 this.headModel.traverse((child) => {
-                    if(child.isMesh) {
-                        child.material.color.setRGB(sc.r, sc.g, sc.b);
-                    }
-                 });
+            if (this.headModel) {
+                console.log('[DEBUG] Fitting head model...');
+                this.headModel.visible = true;
+                
+                // 🔥 2. OBLICZANIE SKALI
+                this.faceMesh.geometry.computeBoundingBox();
+                const faceBox = this.faceMesh.geometry.boundingBox;
+                const faceWidth = (faceBox.max.x - faceBox.min.x) * this.faceMesh.scale.x;
+                const faceHeight = (faceBox.max.y - faceBox.min.y) * this.faceMesh.scale.y;
+                const faceCenter = faceBox.getCenter(new THREE.Vector3());
+                
+                // Resetujemy transformacje głowy przed pomiarem
+                this.headModel.scale.set(1, 1, 1);
+                this.headModel.rotation.set(0, 0, 0);
+                this.headModel.position.set(0,0,0);
+                this.headModel.updateMatrixWorld(true);
+                
+                const headBox = new THREE.Box3().setFromObject(this.headModel);
+                const headWidth = headBox.max.x - headBox.min.x;
+                const headHeight = headBox.max.y - headBox.min.y;
+                
+                // Obliczamy skalę tak, aby głowa była wyraźnie szersza od maski
+                // Maska twarzy to zazwyczaj ok. 40-50% obwodu głowy
+                const scaleX = (faceWidth * 2.15) / headWidth;
+                const scaleY = (faceHeight * 1.5) / headHeight;
+                const uniformScale = Math.max(scaleX, scaleY); // Bierzemy większą, żeby nic nie wystawało
+                
+                console.log('[DEBUG] Applying scale:', { uniformScale });
+                
+                this.headModel.scale.set(uniformScale, uniformScale, uniformScale);
+                this.headModel.updateMatrixWorld(true);
+                
+                // 🔥 3. POZYCJONOWANIE (PRZESUNIĘCIE GŁOWY W TYŁ)
+                const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
+                const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
+                const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
+                
+                // Centrujemy głowę względem twarzy w X i Y
+                const offsetX = faceCenter.x - scaledHeadCenter.x;
+                const offsetY = faceCenter.y - scaledHeadCenter.y;
+                
+                // W osi Z: cofamy głowę
+                // faceCenter.z to mniej więcej "nos". Środek głowy musi być głęboko za nosem.
+                const pushBack = scaledHeadDepth * 0.45; // Cofnięcie o 45% głębokości głowy
+                const offsetZ = faceCenter.z - scaledHeadCenter.z - pushBack;
+                
+                this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
+                
+                // Apply skin color
+                const skinColor = this.faceMesh.userData.skinColor;
+                if (skinColor) {
+                    this.headModel.traverse((child) => {
+                        if (child.isMesh) {
+                            const r = Math.max(skinColor.r * 1.2, 0.5);
+                            const g = Math.max(skinColor.g * 1.2, 0.4);
+                            const b = Math.max(skinColor.b * 1.2, 0.3);
+                            child.material.color.setRGB(r, g, b);
+                            child.material.emissive.setRGB(r * 0.3, g * 0.3, b * 0.3);
+                        }
+                    });
+                }
+                
+                this.faceMesh.renderOrder = 2;
+                this.headModel.renderOrder = 1;
             }
+            
+            this.displayBlendshapes();
+            document.getElementById('exportBtn').disabled = false;
+            this.showStatus('3D model with texture and morph targets generated!', 'success');
+        } catch (error) {
+            console.error('Processing error:', error);
+            this.showStatus('Error: ' + error.message, 'error');
+        } finally {
+            document.getElementById('processBtn').disabled = false;
+            document.getElementById('processBtnText').textContent = 'Process Image';
         }
-
-        document.getElementById('exportBtn').disabled = false;
     }
-
+    
+    displayBlendshapes() {
+        const panel = document.getElementById('blendshapesPanel');
+        const list = document.getElementById('blendshapesList');
+        list.innerHTML = '';
+        Object.entries(this.blendshapes)
+            .filter(([name, value]) => value > 0.01)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([name, value]) => {
+                const item = document.createElement('div');
+                item.className = 'blendshape-item';
+                item.innerHTML = <span class="blendshape-name">${name}</span><span class="blendshape-value">${(value * 100).toFixed(1)}%</span>;
+                list.appendChild(item);
+            });
+        panel.style.display = 'block';
+    }
+    
     async exportGLB() {
         if (!this.faceMesh) return;
-
-        const exporter = new GLTFExporter();
-        const group = new THREE.Group();
-
-        group.add(this.faceMesh.clone());
-        if (this.headModel?.visible)
-            group.add(this.headModel.clone());
-
-        exporter.parse(
-            group,
-            (result) => {
-                const blob = new Blob([result], {
-                    type: 'application/octet-stream'
-                });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'face-model.glb';
-                link.click();
-            },
-            { binary: true }
-        );
+        try {
+            document.getElementById('exportBtn').disabled = true;
+            this.showStatus('Exporting GLB with texture and morph targets...', 'loading');
+            const exporter = new GLTFExporter();
+            const options = { binary: true, maxTextureSize: 2048, embedImages: true, truncateDrawRange: false };
+            const exportGroup = new THREE.Group();
+            exportGroup.add(this.faceMesh.clone());
+            if (this.headModel && this.headModel.visible) exportGroup.add(this.headModel.clone());
+            exporter.parse(exportGroup, (result) => {
+                if (result instanceof ArrayBuffer) {
+                    this.saveArrayBuffer(result, 'face-model-blendshapes.glb');
+                    this.showStatus('GLB model exported successfully!', 'success');
+                }
+            }, (error) => {
+                console.error('Export error:', error);
+                this.showStatus('Export failed: ' + error.message, 'error');
+            }, options);
+        } catch (error) {
+            console.error('Export error:', error);
+            this.showStatus('Export failed: ' + error.message, 'error');
+        } finally {
+            document.getElementById('exportBtn').disabled = false;
+        }
     }
-
+    
+    saveArrayBuffer(buffer, filename) {
+        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+    
+    showStatus(message, type) {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = status ${type};
+        status.style.display = 'block';
+        if (type === 'success') setTimeout(() => { status.style.display = 'none'; }, 3000);
+    }
+    
     onResize() {
         const container = this.renderer.domElement.parentElement;
-        this.camera.aspect =
-            container.clientWidth / container.clientHeight;
+        this.camera.aspect = container.clientWidth / container.clientHeight;
         this.camera.updateProjectionMatrix();
-        this.renderer.setSize(
-            container.clientWidth,
-            container.clientHeight
-        );
+        this.renderer.setSize(container.clientWidth, container.clientHeight);
     }
-
+    
     animate() {
         requestAnimationFrame(() => this.animate());
         this.controls.update();
         this.renderer.render(this.scene, this.camera);
     }
 }
-
 new FaceToBlendshape3D();
