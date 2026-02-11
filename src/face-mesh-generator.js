@@ -61,7 +61,7 @@ export class FaceMeshGenerator {
             // Normalize and center coordinates
             const x = (landmark.x - centerX) / scaleX * 2;
             const y = -(landmark.y - centerY) / scaleY * 2; // Flip Y
-            const z = (landmark.z - centerZ) / scaleZ * 2;
+            const z = -((landmark.z - centerZ) / scaleZ * 2); // Flip Z to face forward
             
             vertices.push(x, y, z);
             
@@ -73,12 +73,13 @@ export class FaceMeshGenerator {
         this.baseVertices = Float32Array.from(vertices);
         
         // Create faces using official MediaPipe triangulation
+        // REVERSE winding order to fix face normals
         const indices = [];
         for (let i = 0; i < FACEMESH_TESSELATION.length; i += 3) {
             indices.push(
                 FACEMESH_TESSELATION[i],
-                FACEMESH_TESSELATION[i + 1],
-                FACEMESH_TESSELATION[i + 2]
+                FACEMESH_TESSELATION[i + 2], // Swapped
+                FACEMESH_TESSELATION[i + 1]  // Swapped
             );
         }
         
@@ -103,7 +104,7 @@ export class FaceMeshGenerator {
             map: texture,
             roughness: 0.7,
             metalness: 0.0,
-            side: THREE.FrontSide,
+            side: THREE.FrontSide, // Only render front faces
             flatShading: false,
             transparent: false
         });
@@ -173,7 +174,7 @@ export class FaceMeshGenerator {
         landmarks.forEach((landmark, index) => {
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
-            let z = (landmark.z - centerZ) / scaleZ * 2;
+            let z = -((landmark.z - centerZ) / scaleZ * 2); // Flip Z
             
             // Apply deformations based on blendshape type
             switch(blendshapeName) {
@@ -211,7 +212,7 @@ export class FaceMeshGenerator {
                     
                 case 'mouthFunnel':
                     if ([0, 17, 61, 291].includes(index)) {
-                        z -= multiplier * 0.3;
+                        z += multiplier * 0.3; // Forward (was backward)
                         x *= 0.8;
                         y *= 0.9;
                     }
@@ -219,7 +220,7 @@ export class FaceMeshGenerator {
                     
                 case 'mouthPucker':
                     if ([61, 291, 0, 17, 78, 308].includes(index)) {
-                        z += multiplier * 0.3;
+                        z -= multiplier * 0.3; // Backward (was forward)
                         x *= 0.7;
                     }
                     break;
@@ -227,7 +228,7 @@ export class FaceMeshGenerator {
                 case 'cheekPuff':
                     if ([118, 347, 425, 205, 36, 266].includes(index)) {
                         x *= 1.15;
-                        z += multiplier * 0.2;
+                        z -= multiplier * 0.2; // Inward
                     }
                     break;
                     
@@ -240,7 +241,7 @@ export class FaceMeshGenerator {
                     break;
                     
                 case 'jawForward':
-                    if (y < -0.2) z += multiplier * 0.4;
+                    if (y < -0.2) z -= multiplier * 0.4; // Forward
                     break;
                     
                 case 'jawLeft':
