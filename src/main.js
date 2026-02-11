@@ -260,14 +260,14 @@ class FaceToBlendshape3D {
                 console.log('Head Raw Dims:', headWidth, headHeight, headCenter);
                 
                 // 3. Calculate Scale Factors
-                // Reduce multipliers for tighter fit (was 1.5/1.8)
+                // SIMPLIFIED: Head should be 1.2x face width and 1.3x face height
                 const safeFaceWidth = faceWidth || 2.0;
                 const safeHeadWidth = headWidth || 2.0;
                 const safeFaceHeight = faceHeight || 2.0;
                 const safeHeadHeight = headHeight || 2.0;
 
-                const targetHeadWidth = safeFaceWidth * 1.35; 
-                const targetHeadHeight = safeFaceHeight * 1.6;
+                const targetHeadWidth = safeFaceWidth * 1.2; 
+                const targetHeadHeight = safeFaceHeight * 1.3;
                 
                 const scaleX = targetHeadWidth / safeHeadWidth;
                 const scaleY = targetHeadHeight / safeHeadHeight;
@@ -323,17 +323,11 @@ class FaceToBlendshape3D {
                 const offsetY = faceCenter.y - scaledHeadCenter.y;
                 
                 // Align Z:
-                // Move head center to face center
-                // THEN push BACK. Since face is now DEEPER, we push back slightly MORE/LESS?
-                // If face is deeper, it occupies more space backwards.
-                // We want head front to meet face back.
-                
                 // Center alignment first:
                 let targetZ = faceCenter.z - scaledHeadCenter.z;
                 
-                // Push back ~40% of head depth to align front of head with back of face
-                // Reverted to 0.4 as depth scale is back to 1.2
-                const pushBack = scaledHeadDepth * 0.4; 
+                // Push back ~38% of head depth since face depth is 1.5
+                const pushBack = scaledHeadDepth * 0.38; 
                 
                 const offsetZ = targetZ - pushBack;
                 
