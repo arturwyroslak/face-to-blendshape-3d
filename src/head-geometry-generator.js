@@ -1,67 +1,37 @@
 /**
  * Head Geometry Generator
- * Extends face mesh with back vertices using ellipsoid projection
+ * Creates smooth ellipsoid back for head
  */
 
 export class HeadGeometryGenerator {
     constructor() {}
     
-    /**
-     * Generate complete head geometry from face landmarks
-     */
     generateCompleteHead(faceLandmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
         const vertices = [];
         const colors = [];
         
-        // Copy original face vertices (0-467)
+        // Face vertices (0-467)
         faceLandmarks.forEach((landmark) => {
             const x = (landmark.x - centerX) / scaleX * 2;
             const y = -(landmark.y - centerY) / scaleY * 2;
             const z = -((landmark.z - centerZ) / scaleZ * 2);
             
             vertices.push(x, y, z);
-            colors.push(1, 1, 1); // White for texture
+            colors.push(1, 1, 1);
         });
         
-        // Face contour/silhouette points (simplified to key points)
-        const silhouetteIndices = [
-            10,   // Forehead center
-            338,  // Right temple  
-            297,  // Right cheek top
-            332,  // Right cheek
-            284,  // Right jaw
-            397,  // Right chin
-            152,  // Chin center
-            176,  // Left chin
-            58,   // Left jaw
-            103,  // Left cheek
-            67,   // Left cheek top
-            109,  // Left temple
-        ];
+        // Key silhouette points
+        const silhouette = [10, 109, 67, 103, 54, 234, 454, 356, 389, 264, 356, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 127];
         
         const skinColor = { r: 0.92, g: 0.82, b: 0.72 };
+        const backData = this.createEllipsoidBack(faceLandmarks, silhouette, skinColor, centerX, centerY, centerZ, scaleX, scaleY, scaleZ);
         
-        // Generate back vertices using simple depth extrusion
-        const backGeometry = this.generateSimpleBack(
-            faceLandmarks,
-            silhouetteIndices,
-            skinColor,
-            centerX, centerY, centerZ,
-            scaleX, scaleY, scaleZ
-        );
-        
-        // Add back vertices
-        backGeometry.vertices.forEach(v => {
+        backData.vertices.forEach(v => {
             vertices.push(v.x, v.y, v.z);
             colors.push(v.r, v.g, v.b);
         });
         
-        // Generate triangulation
-        const backTriangulation = this.generateBackTriangulation(
-            468,
-            silhouetteIndices,
-            backGeometry.layers
-        );
+        const backTriangulation = this.triangulateBack(468, silhouette, backData.segments, backData.rings);
         
         return {
             vertices,
@@ -71,120 +41,62 @@ export class HeadGeometryGenerator {
         };
     }
     
-    /**
-     * Generate back using simple depth layers
-     */
-    generateSimpleBack(faceLandmarks, silhouetteIndices, skinColor, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
+    createEllipsoidBack(faceLandmarks, silhouette, skinColor, cx, cy, cz, sx, sy, sz) {
         const vertices = [];
-        const numLayers = 6;
-        const pointsPerLayer = silhouetteIndices.length;
+        const segments = silhouette.length;
+        const rings = 5;
         
-        // Define depth and scale for each layer
-        const layerConfig = [
-            { z: -0.4, scale: 1.0, yShift: 0.0 },    // Near face
-            { z: -0.7, scale: 0.92, yShift: 0.02 },  // Mid-near
-            { z: -1.0, scale: 0.82, yShift: 0.05 },  // Mid
-            { z: -1.2, scale: 0.70, yShift: 0.08 },  // Mid-far
-            { z: -1.35, scale: 0.58, yShift: 0.12 }, // Far
-            { z: -1.4, scale: 0.45, yShift: 0.15 }   // Very far
-        ];
+        // Calculate head dimensions
+        const headWidth = 1.0;
+        const headHeight = 1.3;
+        const headDepth = 1.1;
         
-        // Generate layers
-        for (let layer = 0; layer < numLayers; layer++) {
-            const config = layerConfig[layer];
+        // Generate back as ellipsoid surface
+        for (let ring = 0; ring <= rings; ring++) {
+            const v = ring / rings; // 0 to 1
+            const phi = v * Math.PI; // 0 to PI (top to bottom)
             
-            for (let i = 0; i < pointsPerLayer; i++) {
-                const silIdx = silhouetteIndices[i];
-                const landmark = faceLandmarks[silIdx];
+            for (let seg = 0; seg < segments; seg++) {
+                const u = seg / segments; // 0 to 1
+                const theta = Math.PI + u * Math.PI; // PI to 2PI (back hemisphere)
                 
-                let x = (landmark.x - centerX) / scaleX * 2;
-                let y = -(landmark.y - centerY) / scaleY * 2;
+                // Ellipsoid parametric equations
+                const x = headWidth * Math.sin(phi) * Math.cos(theta) * 0.5;
+                const y = headHeight * Math.cos(phi) * 0.5;
+                const z = -headDepth * Math.sin(phi) * Math.sin(theta) * 0.5 - 0.3;
                 
-                // Scale towards center
-                x *= config.scale;
-                
-                // Lift top of head
-                const isTop = i < 3 || i > pointsPerLayer - 3;
-                if (isTop) {
-                    y += config.yShift + (layer * 0.04);
-                    x *= 0.9; // Narrow top more
-                }
-                
-                // Set Z depth
-                const z = config.z;
-                
-                vertices.push({
-                    x, y, z,
-                    r: skinColor.r,
-                    g: skinColor.g,
-                    b: skinColor.b
-                });
+                vertices.push({ x, y, z, r: skinColor.r, g: skinColor.g, b: skinColor.b });
             }
         }
         
-        // Add apex (top center of head)
-        const topLandmark = faceLandmarks[10];
-        const topY = -(topLandmark.y - centerY) / scaleY * 2 + 0.5;
-        
-        vertices.push({
-            x: 0,
-            y: topY,
-            z: -1.2,
-            r: skinColor.r,
-            g: skinColor.g,
-            b: skinColor.b
-        });
-        
-        return {
-            vertices,
-            layers: numLayers
-        };
+        return { vertices, segments, rings };
     }
     
-    /**
-     * Generate triangulation
-     */
-    generateBackTriangulation(startIdx, silhouetteIndices, numLayers) {
+    triangulateBack(startIdx, silhouette, segments, rings) {
         const indices = [];
-        const pointsPerLayer = silhouetteIndices.length;
         
-        // Connect face silhouette to first back layer
-        for (let i = 0; i < pointsPerLayer; i++) {
-            const faceIdx1 = silhouetteIndices[i];
-            const faceIdx2 = silhouetteIndices[(i + 1) % pointsPerLayer];
-            const backIdx1 = startIdx + i;
-            const backIdx2 = startIdx + ((i + 1) % pointsPerLayer);
+        // Connect face to back (first ring)
+        for (let i = 0; i < silhouette.length; i++) {
+            const faceIdx = silhouette[i];
+            const nextFaceIdx = silhouette[(i + 1) % silhouette.length];
+            const backIdx = startIdx + i;
+            const nextBackIdx = startIdx + ((i + 1) % segments);
             
-            // Quad as two triangles
-            indices.push(faceIdx1, faceIdx2, backIdx1);
-            indices.push(faceIdx2, backIdx2, backIdx1);
+            indices.push(faceIdx, nextFaceIdx, backIdx);
+            indices.push(nextFaceIdx, nextBackIdx, backIdx);
         }
         
-        // Connect layers
-        for (let layer = 0; layer < numLayers - 1; layer++) {
-            const layer1Start = startIdx + layer * pointsPerLayer;
-            const layer2Start = startIdx + (layer + 1) * pointsPerLayer;
-            
-            for (let i = 0; i < pointsPerLayer; i++) {
-                const p1 = layer1Start + i;
-                const p2 = layer1Start + ((i + 1) % pointsPerLayer);
-                const p3 = layer2Start + i;
-                const p4 = layer2Start + ((i + 1) % pointsPerLayer);
+        // Connect rings
+        for (let ring = 0; ring < rings; ring++) {
+            for (let seg = 0; seg < segments; seg++) {
+                const current = startIdx + ring * segments + seg;
+                const next = startIdx + ring * segments + ((seg + 1) % segments);
+                const below = startIdx + (ring + 1) * segments + seg;
+                const belowNext = startIdx + (ring + 1) * segments + ((seg + 1) % segments);
                 
-                indices.push(p1, p2, p3);
-                indices.push(p2, p4, p3);
+                indices.push(current, next, below);
+                indices.push(next, belowNext, below);
             }
-        }
-        
-        // Connect last layer to apex
-        const lastLayerStart = startIdx + (numLayers - 1) * pointsPerLayer;
-        const apexIdx = startIdx + numLayers * pointsPerLayer;
-        
-        for (let i = 0; i < pointsPerLayer; i++) {
-            const p1 = lastLayerStart + i;
-            const p2 = lastLayerStart + ((i + 1) % pointsPerLayer);
-            
-            indices.push(p1, p2, apexIdx);
         }
         
         return indices;
