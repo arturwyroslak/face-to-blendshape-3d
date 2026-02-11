@@ -45,11 +45,13 @@ export class FaceMeshGenerator {
         const centerY = (minY + maxY) / 2;
         const centerZ = (minZ + maxZ) / 2;
         
-        // Independent scaling for X and Y to preserve face aspect ratio
-        // But use max(X,Y) for Z to maintain reasonable depth
+        // Independent X/Y scaling to preserve face aspect ratio
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
-        const scaleZ = Math.max(scaleX, scaleY) * 1.5;  // Keep reasonable Z depth
+        // Z uses a fixed normalization factor (MediaPipe Z is in different scale)
+        // Similar to spite's approach: -p[2] / 500
+        // MediaPipe normalizedLandmarks Z is roughly in range [-0.5, 0.5] relative to image width
+        const scaleZ = Math.max(scaleX, scaleY);  // Match X/Y scale for proper depth ratio
         
         // Calculate texture crop bounds (same as TextureMapper)
         const padding = 0.2;
