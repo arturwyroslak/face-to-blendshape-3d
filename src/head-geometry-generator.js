@@ -65,18 +65,30 @@ export class HeadGeometryGenerator {
     
     generateBackVertices(faceLandmarks, contourIndices, skinColor, cx, cy, cz, sx, sy, sz) {
         const vertices = [];
-        const numLayers = 6;
+        const numLayers = 8; // More layers for smoother head shape
         const pointsPerLayer = contourIndices.length - 1;  // Exclude duplicate
         
-        // Layer configurations - moving backwards (decreasing Z)
-        const layerConfigs = [
-            { zOffset: -0.3, xScale: 0.95, yShift: 0.0 },
-            { zOffset: -0.5, xScale: 0.88, yShift: 0.05 },
-            { zOffset: -0.7, xScale: 0.78, yShift: 0.1 },
-            { zOffset: -0.85, xScale: 0.65, yShift: 0.15 },
-            { zOffset: -0.95, xScale: 0.5, yShift: 0.2 },
-            { zOffset: -1.0, xScale: 0.35, yShift: 0.25 }
-        ];
+        // Create a full cranial shape (spherical extension)
+        // Depth needs to be comparable to width (which is ~2.0 units: -1 to 1)
+        // So we extend Z back to roughly -1.8
+        
+        const layerConfigs = [];
+        for (let i = 0; i < numLayers; i++) {
+            const t = (i + 1) / numLayers; // 0 to 1
+            
+            // Non-linear depth progression for rounded shape
+            const zOffset = -0.2 - (t * 1.6); // Ends at -1.8
+            
+            // Spherical falloff for X/Y scale
+            // cos(t * PI/2) gives a circular curve starting at 1.0 and ending at 0
+            const curve = Math.cos(t * Math.PI * 0.4); // Don't go to 0 completely, stay open for apex
+            
+            layerConfigs.push({
+                zOffset: zOffset,
+                scale: curve,
+                yShift: i * 0.05 // Slight lift for cranium
+            });
+        }
         
         // Generate layers from face backwards
         for (let layer = 0; layer < numLayers; layer++) {
@@ -89,14 +101,20 @@ export class HeadGeometryGenerator {
                 let x = (landmark.x - cx) / sx * 2;
                 let y = -(landmark.y - cy) / sy * 2;
                 
-                // Scale X towards center
-                x *= config.xScale;
+                // Scale towards center to form sphere
+                x *= config.scale;
                 
-                // Lift and narrow top of head
-                const isTop = i === 0 || i === pointsPerLayer - 1;
+                // Adjust Y to form proper skull shape
+                // Lift top, tuck chin
+                const isTop = i === 0 || i === pointsPerLayer - 1; // Forehead
+                const isBottom = i === 4 || i === 5 || i === 6;    // Chin area
+                
                 if (isTop) {
-                    y += config.yShift + (layer * 0.03);
-                    x *= 0.85;
+                    y += config.yShift; // Lift cranium
+                } else if (isBottom) {
+                     // Chin doesn't go back as much as cranium, tuck it in/up
+                     y += layer * 0.1; 
+                     // Pull chin Z less far back? No, simplify: keep Z ring uniform, adjust Y
                 }
                 
                 // Z moves backwards
@@ -111,14 +129,12 @@ export class HeadGeometryGenerator {
             }
         }
         
-        // Add apex (top center)
-        const topLandmark = faceLandmarks[10];
-        const topY = -(topLandmark.y - cy) / sy * 2 + 0.5;
-        
+        // Add apex (Occiput - back of head center)
+        // Instead of high Y, place it centrally at the furthest back point
         vertices.push({
             x: 0,
-            y: topY,
-            z: -0.9,
+            y: 0.3, // Slightly above center for correct skull center
+            z: -2.0, // Furthest point
             r: skinColor.r,
             g: skinColor.g,
             b: skinColor.b
