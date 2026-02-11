@@ -62,29 +62,89 @@ class FaceToBlendshape3D {
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
         this.renderer.setSize(container.clientWidth, container.clientHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
+        
+        // Enable shadows
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
         this.controls = new OrbitControls(this.camera, canvas);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        
+        // AGGRESSIVE LIGHTING - multiple angles
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.6
         this.scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(0, 1, 1);
-        this.scene.add(directionalLight);
-        const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-        backLight.position.set(0, 0, -1);
+        
+        const frontLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        frontLight.position.set(0, 0, 5);
+        frontLight.castShadow = false;
+        this.scene.add(frontLight);
+        
+        const topLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        topLight.position.set(0, 5, 0);
+        topLight.castShadow = false;
+        this.scene.add(topLight);
+        
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        backLight.position.set(0, 0, -5);
         this.scene.add(backLight);
+        
+        const leftLight = new THREE.PointLight(0xffffff, 0.5);
+        leftLight.position.set(-5, 0, 0);
+        this.scene.add(leftLight);
+        
+        const rightLight = new THREE.PointLight(0xffffff, 0.5);
+        rightLight.position.set(5, 0, 0);
+        this.scene.add(rightLight);
+        
         const loader = new GLTFLoader();
+        console.log('[DEBUG] Loading head.glb from:', headModelUrl);
+        
         loader.load(headModelUrl, (gltf) => {
             this.headModel = gltf.scene;
+            console.log('[DEBUG] Head model loaded:', this.headModel);
+            console.log('[DEBUG] Model children:', this.headModel.children);
+            
+            // Deep inspection
+            this.headModel.traverse((child) => {
+                console.log('[DEBUG] Child:', child.name, child.type);
+                if (child.isMesh) {
+                    console.log('[DEBUG] Mesh material BEFORE:', child.material);
+                    console.log('[DEBUG] Mesh geometry:', child.geometry);
+                    console.log('[DEBUG] Vertex count:', child.geometry.attributes.position?.count);
+                    
+                    // FORCE REPLACE material immediately
+                    const forcedMat = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(0.8, 0.6, 0.5), // Tan/beige
+                        roughness: 0.6,
+                        metalness: 0.0,
+                        emissive: new THREE.Color(0.3, 0.2, 0.15), // Strong emission
+                        emissiveIntensity: 0.4,
+                        side: THREE.FrontSide, // Try FrontSide instead of DoubleSide
+                        flatShading: false
+                    });
+                    child.material = forcedMat;
+                    child.castShadow = false;
+                    child.receiveShadow = false;
+                    console.log('[DEBUG] Mesh material AFTER:', child.material);
+                }
+            });
+            
             const box = new THREE.Box3().setFromObject(this.headModel);
             const center = box.getCenter(new THREE.Vector3());
             this.headModel.position.sub(center);
+            console.log('[DEBUG] Head model centered at:', this.headModel.position);
+            
             this.scene.add(this.headModel);
             this.headModel.visible = false;
-        }, undefined, (error) => {
-            console.error('Error loading head model:', error);
+            console.log('[DEBUG] Head model added to scene (hidden)');
+        }, (progress) => {
+            console.log('[DEBUG] Loading progress:', progress.loaded, '/', progress.total);
+        }, (error) => {
+            console.error('[ERROR] Loading head model:', error);
             this.showStatus('Failed to load head model.', 'error');
         });
+        
         window.addEventListener('resize', () => this.onResize());
     }
     
@@ -147,64 +207,87 @@ class FaceToBlendshape3D {
             if (oldMesh) this.scene.remove(oldMesh);
             this.faceMesh.name = 'faceMesh';
             this.scene.add(this.faceMesh);
+            
             if (this.headModel) {
+                console.log('[DEBUG] Fitting head model...');
                 this.headModel.visible = true;
+                
                 this.faceMesh.geometry.computeBoundingBox();
                 const faceBox = this.faceMesh.geometry.boundingBox;
                 const faceWidth = faceBox.max.x - faceBox.min.x;
                 const faceHeight = faceBox.max.y - faceBox.min.y;
                 const faceCenter = faceBox.getCenter(new THREE.Vector3());
+                
+                console.log('[DEBUG] Face dims:', { width: faceWidth, height: faceHeight, center: faceCenter });
+                
                 this.headModel.scale.set(1, 1, 1);
                 this.headModel.rotation.set(0, 0, 0);
                 this.headModel.position.set(0,0,0);
                 this.headModel.updateMatrixWorld(true);
+                
                 const headBox = new THREE.Box3().setFromObject(this.headModel);
                 const headWidth = headBox.max.x - headBox.min.x;
                 const headHeight = headBox.max.y - headBox.min.y;
                 const headDepth = headBox.max.z - headBox.min.z;
+                
+                console.log('[DEBUG] Head original dims:', { width: headWidth, height: headHeight, depth: headDepth });
+                
                 const safeFaceWidth = faceWidth || 2.0;
                 const safeHeadWidth = headWidth || 2.0;
                 const safeFaceHeight = faceHeight || 2.0;
                 const safeHeadHeight = headHeight || 2.0;
+                
                 const targetHeadWidth = safeFaceWidth * 1.15;
                 const targetHeadHeight = safeFaceHeight * 1.45;
+                
                 const scaleX = targetHeadWidth / safeHeadWidth;
                 const scaleY = targetHeadHeight / safeHeadHeight;
                 const uniformScale = Math.max(scaleX, scaleY);
+                
+                console.log('[DEBUG] Applying scale:', { scaleX, scaleY, uniformScale });
+                
                 this.headModel.scale.set(scaleX, scaleY, uniformScale);
                 this.headModel.updateMatrixWorld(true);
+                
+                // Apply skin color AGAIN after processing
                 const skinColor = this.faceMesh.userData.skinColor;
+                console.log('[DEBUG] Applying skin color:', skinColor);
+                
                 if (skinColor) {
                     this.headModel.traverse((child) => {
                         if (child.isMesh) {
-                            const r = Math.max(skinColor.r, 0.5);
-                            const g = Math.max(skinColor.g, 0.4);
-                            const b = Math.max(skinColor.b, 0.3);
-                            const newMat = new THREE.MeshStandardMaterial({
-                                color: new THREE.Color(r, g, b),
-                                roughness: 0.5,
-                                metalness: 0.0,
-                                emissive: new THREE.Color(0x222222),
-                                emissiveIntensity: 0.2,
-                                side: THREE.DoubleSide
-                            });
-                            if (child.isSkinnedMesh) newMat.skinning = true;
-                            child.material = newMat;
+                            const r = Math.max(skinColor.r * 1.2, 0.5); // Boost brightness
+                            const g = Math.max(skinColor.g * 1.2, 0.4);
+                            const b = Math.max(skinColor.b * 1.2, 0.3);
+                            
+                            console.log('[DEBUG] Setting mesh color to:', { r, g, b });
+                            
+                            child.material.color.setRGB(r, g, b);
+                            child.material.emissive.setRGB(r * 0.3, g * 0.3, b * 0.3);
+                            child.material.needsUpdate = true;
                         }
                     });
                 }
+                
                 const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
                 const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
                 const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
+                
                 const offsetX = faceCenter.x - scaledHeadCenter.x;
                 const offsetY = faceCenter.y - scaledHeadCenter.y;
                 let targetZ = faceCenter.z - scaledHeadCenter.z;
                 const pushBack = scaledHeadDepth * 0.4;
                 const offsetZ = targetZ - pushBack;
+                
                 this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
+                
+                console.log('[DEBUG] Final head position:', this.headModel.position);
+                console.log('[DEBUG] Head visible:', this.headModel.visible);
+                
                 this.faceMesh.renderOrder = 2;
                 this.headModel.renderOrder = 1;
             }
+            
             this.displayBlendshapes();
             document.getElementById('exportBtn').disabled = false;
             this.showStatus('3D model with texture and morph targets generated!', 'success');
