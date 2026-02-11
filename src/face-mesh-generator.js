@@ -52,11 +52,12 @@ export class FaceMeshGenerator {
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
         
-        // 1.15 makes the face narrower
-        const correctedScaleX = scaleX * 1.15;  
-        // Fix depth: 0.6 was too extreme, causing self-shadowing/artifacts.
-        // 1.2 is a good balance for depth without distortion.
-        const scaleZ = Math.max(scaleX, scaleY) * 1.2; 
+        // 1.05 makes the face slightly narrower but not too much (was 1.15)
+        const correctedScaleX = scaleX * 1.05;  
+        // Depth: 1.5 is a safe middle ground. 
+        // 1.8 was too flat (large divisor), 0.6 was too deep (small divisor).
+        // 1.5 provides good volume without distortion.
+        const scaleZ = Math.max(scaleX, scaleY) * 1.5; 
         
         // Calculate texture crop bounds
         const padding = 0.2;
