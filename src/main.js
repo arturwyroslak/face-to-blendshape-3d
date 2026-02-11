@@ -224,7 +224,7 @@ class FaceToBlendshape3D {
                 this.headModel.scale.set(uniformScale, uniformScale, uniformScale);
                 this.headModel.updateMatrixWorld(true);
                 
-                // 🔥 3. POZYCJONOWANIE (POPRAWKA: GŁOWA MOCNO W TYŁ I LEKKO W GÓRĘ)
+                // 🔥 3. POZYCJONOWANIE (POPRAWKA: MNIEJSZE COFNIĘCIE)
                 const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
                 const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
                 const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
@@ -232,20 +232,17 @@ class FaceToBlendshape3D {
                 // Centrujemy głowę względem twarzy w X
                 const offsetX = faceCenter.x - scaledHeadCenter.x;
                 
-                // W osi Y: Podnosimy głowę lekko do góry, żeby nie zasłaniała oczu
-                // Przesuwamy środek głowy wyżej niż środek twarzy
-                const offsetY = (faceCenter.y - scaledHeadCenter.y) + (faceHeight * 0.15); 
+                // W osi Y: Podnosimy głowę lekko do góry
+                const offsetY = (faceCenter.y - scaledHeadCenter.y) + (faceHeight * 0.12); 
                 
-                // W osi Z: MOCNE COFNIĘCIE
-                // faceCenter.z to nos. Musimy cofnąć głowę tak, by jej przód był za uszami maski.
-                // Używamy 0.75 (75%) głębokości głowy jako przesunięcia w tył.
-                const pushBack = scaledHeadDepth * 0.75; 
+                // W osi Z: COFNIĘCIE O 55% GŁĘBOKOŚCI
+                const pushBack = scaledHeadDepth * 0.55; 
                 const offsetZ = faceCenter.z - scaledHeadCenter.z - pushBack;
                 
                 this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
 
-                // Dodatkowa korekta rotacji - pochylamy głowę minimalnie w dół, żeby pasowała do czoła
-                this.headModel.rotation.x = 0.1; 
+                // Dodatkowa korekta rotacji
+                this.headModel.rotation.x = 0.05; 
                 this.headModel.updateMatrixWorld(true);
                 
                 // Koloryzacja głowy
