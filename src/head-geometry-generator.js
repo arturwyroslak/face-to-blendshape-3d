@@ -10,15 +10,14 @@ export class HeadGeometryGenerator {
         const vertices = [];
         const colors = [];
         
-        // Use UNIFORM scaling based on height (scaleY) to preserve aspect ratio
-        // This prevents width distortion
-        const uniformScale = scaleY;
+        // Apply subtle width correction (0.92 = 8% narrower)
+        const correctedScaleX = scaleX * 1.08;  // Divide by this to make narrower
         
         // Face vertices (0-467) with POSITIVE Z
         faceLandmarks.forEach((landmark) => {
-            const x = (landmark.x - centerX) / uniformScale * 2;
-            const y = -(landmark.y - centerY) / uniformScale * 2;
-            const z = ((landmark.z - centerZ) / scaleZ * 2);  // Z uses scaleZ
+            const x = (landmark.x - centerX) / correctedScaleX * 2;
+            const y = -(landmark.y - centerY) / scaleY * 2;
+            const z = ((landmark.z - centerZ) / scaleZ * 2);  // POSITIVE
             
             vertices.push(x, y, z);
             colors.push(1, 1, 1);  // White for texture
@@ -44,7 +43,7 @@ export class HeadGeometryGenerator {
         // Generate back vertices
         const backData = this.generateBackVertices(
             faceLandmarks, contourIndices, skinColor,
-            centerX, centerY, centerZ, uniformScale, uniformScale, scaleZ
+            centerX, centerY, centerZ, correctedScaleX, scaleY, scaleZ
         );
         
         backData.vertices.forEach(v => {
