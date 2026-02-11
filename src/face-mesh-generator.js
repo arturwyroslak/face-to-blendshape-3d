@@ -20,10 +20,14 @@ export class FaceMeshGenerator {
         this.geometry = null;
         this.material = null;
         this.mesh = null;
+        this.skinColor = { r: 0.9, g: 0.8, b: 0.7 }; // Default
     }
     
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
         this.geometry = new THREE.BufferGeometry();
+        
+        // Sample skin color for external use (Head Model)
+        this.skinColor = this.sampleSkinColorFromTexture(textureCanvas);
         
         // Calculate bounds for geometry AND UV mapping
         let minX = Infinity, maxX = -Infinity;
@@ -43,10 +47,12 @@ export class FaceMeshGenerator {
         const centerY = (minY + maxY) / 2;
         const centerZ = (minZ + maxZ) / 2;
         
-        // Independent X/Y scaling with width correction
+        // Independent X/Y scaling with STRONGER width correction
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
-        const correctedScaleX = scaleX * 1.08;  // 8% narrower
+        
+        // 1.15 makes the face narrower (dividing by a larger number)
+        const correctedScaleX = scaleX * 1.15;  
         const scaleZ = Math.max(scaleX, scaleY) * 3.0; // Flattened depth
         
         // Calculate texture crop bounds
@@ -126,10 +132,10 @@ export class FaceMeshGenerator {
         this.mesh.receiveShadow = true;
         
         // Store dimensions for external scaling
-        this.mesh.userData.faceWidth = 2.0; // In normalized space X is roughly -1 to 1 = width 2
-        this.mesh.userData.faceHeight = 2.0; // In normalized space Y is roughly -1 to 1 = height 2
-        // Actually calculate real aspect ratio
+        this.mesh.userData.faceWidth = 2.0;
+        this.mesh.userData.faceHeight = 2.0;
         this.mesh.userData.aspectRatio = (maxX - minX) / (maxY - minY);
+        this.mesh.userData.skinColor = this.skinColor; // Export color
         
         // Apply blendshapes
         Object.entries(blendshapes).forEach(([name, value], index) => {
@@ -143,6 +149,42 @@ export class FaceMeshGenerator {
         }
         
         return this.mesh;
+    }
+    
+    sampleSkinColorFromTexture(textureCanvas) {
+        const ctx = textureCanvas.getContext('2d');
+        const width = textureCanvas.width;
+        const height = textureCanvas.height;
+        
+        // Sample from center-ish cheeks/forehead
+        const sampleX = Math.floor(width * 0.5); 
+        const sampleY = Math.floor(height * 0.4); 
+        const sampleSize = 20;
+        
+        try {
+            const imageData = ctx.getImageData(sampleX, sampleY, sampleSize, sampleSize);
+            const data = imageData.data;
+            
+            let r = 0, g = 0, b = 0, count = 0;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i];
+                g += data[i + 1];
+                b += data[i + 2];
+                count++;
+            }
+            
+            if (count === 0) return { r: 0.9, g: 0.8, b: 0.7 };
+
+            return {
+                r: (r / count) / 255,
+                g: (g / count) / 255,
+                b: (b / count) / 255
+            };
+        } catch (e) {
+            console.warn('Skin sample failed', e);
+            return { r: 0.92, g: 0.82, b: 0.72 };
+        }
     }
     
     createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
