@@ -297,6 +297,8 @@ class FaceToBlendshape3D {
                                 color: new THREE.Color(r, g, b),
                                 roughness: 0.5,
                                 metalness: 0.0,
+                                emissive: new THREE.Color(0x222222), // Prevent total blackness
+                                emissiveIntensity: 0.2,
                                 side: THREE.DoubleSide
                             });
                             
@@ -329,8 +331,9 @@ class FaceToBlendshape3D {
                 // Center alignment first:
                 let targetZ = faceCenter.z - scaledHeadCenter.z;
                 
-                // Push back ~45% of head depth to align front of head with back of face
-                const pushBack = scaledHeadDepth * 0.45; 
+                // Push back ~40% of head depth to align front of head with back of face
+                // Reverted to 0.4 as depth scale is back to 1.2
+                const pushBack = scaledHeadDepth * 0.4; 
                 
                 const offsetZ = targetZ - pushBack;
                 
