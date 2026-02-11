@@ -300,7 +300,8 @@ class FaceToBlendshape3D {
             .forEach(([name, value]) => {
                 const item = document.createElement('div');
                 item.className = 'blendshape-item';
-                item.innerHTML = <span class="blendshape-name">${name}</span><span class="blendshape-value">${(value * 100).toFixed(1)}%</span>;
+                // 🔥 POPRAWIONE (backticki)
+                item.innerHTML = `<span class="blendshape-name">${name}</span><span class="blendshape-value">${(value * 100).toFixed(1)}%</span>`;
                 list.appendChild(item);
             });
         panel.style.display = 'block';
@@ -346,7 +347,8 @@ class FaceToBlendshape3D {
     showStatus(message, type) {
         const status = document.getElementById('status');
         status.textContent = message;
-        status.className = status ${type};
+        // 🔥 POPRAWIONE (backticki)
+        status.className = `status ${type}`;
         status.style.display = 'block';
         if (type === 'success') setTimeout(() => { status.style.display = 'none'; }, 3000);
     }
