@@ -327,7 +327,8 @@ class FaceToBlendshape3D {
                 // Now push back. Head center is at 0 (relative). Front is at +Depth/2.
                 // We want Front (+Depth/2) to be at Face Z.
                 // So move center back by Depth/2.
-                const pushBack = scaledHeadDepth * 0.4; // 40% of depth back
+                // Adjusted from 0.4 to 0.35 to account for rounder face mesh
+                const pushBack = scaledHeadDepth * 0.35; 
                 
                 const offsetZ = targetZ - pushBack;
                 
