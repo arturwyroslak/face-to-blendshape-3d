@@ -97,14 +97,21 @@ class FaceToBlendshape3D {
         const loader = new GLTFLoader();
         loader.load('./head.glb', (gltf) => {
             this.headModel = gltf.scene;
-            // Center the loaded model
+            
+            // Debug: Log model structure
+            console.log('Head GLB loaded:', this.headModel);
+            this.headModel.traverse(c => {
+                if(c.isMesh) console.log('Mesh found:', c.name);
+            });
+
+            // Center the loaded model initially
             const box = new THREE.Box3().setFromObject(this.headModel);
             const center = box.getCenter(new THREE.Vector3());
             this.headModel.position.sub(center);
             
             this.scene.add(this.headModel);
             this.headModel.visible = false; // Hide until processing
-            console.log('Head model loaded');
+            console.log('Head model added to scene (hidden)');
         }, undefined, (error) => {
             console.error('An error occurred loading the head model:', error);
         });
@@ -218,6 +225,7 @@ class FaceToBlendshape3D {
             
             // Fit Head Model to Face Mesh
             if (this.headModel) {
+                console.log('Fitting Head Model...');
                 this.headModel.visible = true;
                 
                 // 1. Calculate Face Mesh Dimensions
@@ -227,10 +235,13 @@ class FaceToBlendshape3D {
                 const faceHeight = faceBox.max.y - faceBox.min.y;
                 const faceCenter = faceBox.getCenter(new THREE.Vector3());
                 
+                console.log('Face Dims:', faceWidth, faceHeight, faceCenter);
+
                 // 2. Calculate Head Model Dimensions (Base State)
                 // Reset transforms first to get true size
                 this.headModel.scale.set(1, 1, 1);
                 this.headModel.rotation.set(0, 0, 0);
+                this.headModel.position.set(0,0,0);
                 this.headModel.updateMatrixWorld(true);
                 
                 const headBox = new THREE.Box3().setFromObject(this.headModel);
@@ -238,15 +249,25 @@ class FaceToBlendshape3D {
                 const headHeight = headBox.max.y - headBox.min.y;
                 // Get Center of Head Model for alignment
                 const headCenter = headBox.getCenter(new THREE.Vector3());
+
+                console.log('Head Raw Dims:', headWidth, headHeight, headCenter);
                 
                 // 3. Calculate Scale Factors
                 // Target width: 1.5x face width
-                const targetHeadWidth = faceWidth * 1.5; 
-                const targetHeadHeight = faceHeight * 1.8;
+                // Safeguard against zero width
+                const safeFaceWidth = faceWidth || 2.0;
+                const safeHeadWidth = headWidth || 2.0;
+                const safeFaceHeight = faceHeight || 2.0;
+                const safeHeadHeight = headHeight || 2.0;
+
+                const targetHeadWidth = safeFaceWidth * 1.5; 
+                const targetHeadHeight = safeFaceHeight * 1.8;
                 
-                const scaleX = targetHeadWidth / headWidth;
-                const scaleY = targetHeadHeight / headHeight;
+                const scaleX = targetHeadWidth / safeHeadWidth;
+                const scaleY = targetHeadHeight / safeHeadHeight;
                 const uniformScale = Math.max(scaleX, scaleY);
+                
+                console.log('Applying Scale:', scaleX, scaleY, uniformScale);
                 
                 this.headModel.scale.set(scaleX, scaleY, uniformScale);
                 this.headModel.updateMatrixWorld(true);
@@ -261,6 +282,8 @@ class FaceToBlendshape3D {
                             child.material.color.setRGB(skinColor.r, skinColor.g, skinColor.b);
                             child.material.map = null; // Remove existing texture
                             child.material.needsUpdate = true;
+                            // Ensure double sided or front sided visibility
+                            child.material.side = THREE.DoubleSide; 
                         }
                     });
                 }
@@ -275,17 +298,23 @@ class FaceToBlendshape3D {
                 const offsetY = faceCenter.y - scaledHeadCenter.y;
                 
                 // Align Z:
-                // We want the front of the head (max Z) to be slightly behind the face (min Z).
-                // Actually, the face is a mask, so its MinZ (ears/edges) should meet the Head MaxZ (ears/cheeks).
-                // Or rather, the Head should be behind.
-                // Let's place Head MaxZ at Face MinZ + slight overlap
-                const offsetZ = (faceBox.min.z - scaledHeadBox.max.z) + 0.1; // +0.1 overlap
+                // Move head center to face center, then push back
+                // Head MaxZ should be near Face MinZ
+                // Let's rely on Box3 centers for safety
+                // Current Head Z Center needs to move to Face Z Center, then Offset
+                const offsetZ = faceCenter.z - scaledHeadCenter.z + 0.5; // Push forward/back relative
+                // Or better: align Back of Face to Front of Head
+                // const zShift = (faceBox.min.z - scaledHeadBox.max.z) + 0.2;
                 
                 this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
                 
+                console.log('Final Head Position:', this.headModel.position);
+
                 // Render order
                 this.faceMesh.renderOrder = 2;
                 this.headModel.renderOrder = 1;
+            } else {
+                console.warn('Head model not loaded yet');
             }
             
             // Display blendshapes
