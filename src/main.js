@@ -71,8 +71,8 @@ class FaceToBlendshape3D {
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
         
-        // AGGRESSIVE LIGHTING - multiple angles
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.6
+        // AGGRESSIVE LIGHTING
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         this.scene.add(ambientLight);
         
         const frontLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -98,49 +98,34 @@ class FaceToBlendshape3D {
         this.scene.add(rightLight);
         
         const loader = new GLTFLoader();
-        console.log('[DEBUG] Loading head.glb from:', headModelUrl);
         
         loader.load(headModelUrl, (gltf) => {
             this.headModel = gltf.scene;
-            console.log('[DEBUG] Head model loaded:', this.headModel);
-            console.log('[DEBUG] Model children:', this.headModel.children);
             
-            // Deep inspection
             this.headModel.traverse((child) => {
-                console.log('[DEBUG] Child:', child.name, child.type);
                 if (child.isMesh) {
-                    console.log('[DEBUG] Mesh material BEFORE:', child.material);
-                    console.log('[DEBUG] Mesh geometry:', child.geometry);
-                    console.log('[DEBUG] Vertex count:', child.geometry.attributes.position?.count);
-                    
-                    // FORCE REPLACE material immediately
                     const forcedMat = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(0.8, 0.6, 0.5), // Tan/beige
+                        color: new THREE.Color(0.8, 0.6, 0.5),
                         roughness: 0.6,
                         metalness: 0.0,
-                        emissive: new THREE.Color(0.3, 0.2, 0.15), // Strong emission
+                        emissive: new THREE.Color(0.3, 0.2, 0.15),
                         emissiveIntensity: 0.4,
-                        side: THREE.FrontSide, // Try FrontSide instead of DoubleSide
+                        side: THREE.FrontSide,
                         flatShading: false
                     });
                     child.material = forcedMat;
                     child.castShadow = false;
                     child.receiveShadow = false;
-                    console.log('[DEBUG] Mesh material AFTER:', child.material);
                 }
             });
             
             const box = new THREE.Box3().setFromObject(this.headModel);
             const center = box.getCenter(new THREE.Vector3());
             this.headModel.position.sub(center);
-            console.log('[DEBUG] Head model centered at:', this.headModel.position);
             
             this.scene.add(this.headModel);
             this.headModel.visible = false;
-            console.log('[DEBUG] Head model added to scene (hidden)');
-        }, (progress) => {
-            console.log('[DEBUG] Loading progress:', progress.loaded, '/', progress.total);
-        }, (error) => {
+        }, undefined, (error) => {
             console.error('[ERROR] Loading head model:', error);
             this.showStatus('Failed to load head model.', 'error');
         });
@@ -223,7 +208,6 @@ class FaceToBlendshape3D {
                 const faceHeight = (faceBox.max.y - faceBox.min.y) * this.faceMesh.scale.y;
                 const faceCenter = faceBox.getCenter(new THREE.Vector3());
                 
-                // Resetujemy transformacje głowy przed pomiarem
                 this.headModel.scale.set(1, 1, 1);
                 this.headModel.rotation.set(0, 0, 0);
                 this.headModel.position.set(0,0,0);
@@ -233,34 +217,38 @@ class FaceToBlendshape3D {
                 const headWidth = headBox.max.x - headBox.min.x;
                 const headHeight = headBox.max.y - headBox.min.y;
                 
-                // Obliczamy skalę tak, aby głowa była wyraźnie szersza od maski
-                // Maska twarzy to zazwyczaj ok. 40-50% obwodu głowy
                 const scaleX = (faceWidth * 2.15) / headWidth;
                 const scaleY = (faceHeight * 1.5) / headHeight;
-                const uniformScale = Math.max(scaleX, scaleY); // Bierzemy większą, żeby nic nie wystawało
-                
-                console.log('[DEBUG] Applying scale:', { uniformScale });
+                const uniformScale = Math.max(scaleX, scaleY);
                 
                 this.headModel.scale.set(uniformScale, uniformScale, uniformScale);
                 this.headModel.updateMatrixWorld(true);
                 
-                // 🔥 3. POZYCJONOWANIE (PRZESUNIĘCIE GŁOWY W TYŁ)
+                // 🔥 3. POZYCJONOWANIE (POPRAWKA: GŁOWA MOCNO W TYŁ I LEKKO W GÓRĘ)
                 const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
                 const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
                 const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
                 
-                // Centrujemy głowę względem twarzy w X i Y
+                // Centrujemy głowę względem twarzy w X
                 const offsetX = faceCenter.x - scaledHeadCenter.x;
-                const offsetY = faceCenter.y - scaledHeadCenter.y;
                 
-                // W osi Z: cofamy głowę
-                // faceCenter.z to mniej więcej "nos". Środek głowy musi być głęboko za nosem.
-                const pushBack = scaledHeadDepth * 0.45; // Cofnięcie o 45% głębokości głowy
+                // W osi Y: Podnosimy głowę lekko do góry, żeby nie zasłaniała oczu
+                // Przesuwamy środek głowy wyżej niż środek twarzy
+                const offsetY = (faceCenter.y - scaledHeadCenter.y) + (faceHeight * 0.15); 
+                
+                // W osi Z: MOCNE COFNIĘCIE
+                // faceCenter.z to nos. Musimy cofnąć głowę tak, by jej przód był za uszami maski.
+                // Używamy 0.75 (75%) głębokości głowy jako przesunięcia w tył.
+                const pushBack = scaledHeadDepth * 0.75; 
                 const offsetZ = faceCenter.z - scaledHeadCenter.z - pushBack;
                 
                 this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
+
+                // Dodatkowa korekta rotacji - pochylamy głowę minimalnie w dół, żeby pasowała do czoła
+                this.headModel.rotation.x = 0.1; 
+                this.headModel.updateMatrixWorld(true);
                 
-                // Apply skin color
+                // Koloryzacja głowy
                 const skinColor = this.faceMesh.userData.skinColor;
                 if (skinColor) {
                     this.headModel.traverse((child) => {
@@ -300,7 +288,6 @@ class FaceToBlendshape3D {
             .forEach(([name, value]) => {
                 const item = document.createElement('div');
                 item.className = 'blendshape-item';
-                // 🔥 POPRAWIONE (backticki)
                 item.innerHTML = `<span class="blendshape-name">${name}</span><span class="blendshape-value">${(value * 100).toFixed(1)}%</span>`;
                 list.appendChild(item);
             });
@@ -347,7 +334,6 @@ class FaceToBlendshape3D {
     showStatus(message, type) {
         const status = document.getElementById('status');
         status.textContent = message;
-        // 🔥 POPRAWIONE (backticki)
         status.className = `status ${type}`;
         status.style.display = 'block';
         if (type === 'success') setTimeout(() => { status.style.display = 'none'; }, 3000);
