@@ -45,11 +45,11 @@ export class FaceMeshGenerator {
         const centerY = (minY + maxY) / 2;
         const centerZ = (minZ + maxZ) / 2;
         
-        // Use scaleY (height) as uniform scale for X and Y to preserve aspect ratio
+        // Independent X/Y scaling with width correction
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
-        const uniformScale = scaleY;  // Base everything on height
-        const scaleZ = Math.max(scaleX, scaleY);  // Z uses max(X,Y) for proper depth
+        const correctedScaleX = scaleX * 1.08;  // 8% narrower
+        const scaleZ = Math.max(scaleX, scaleY);  // Z uses max for proper depth
         
         // Calculate texture crop bounds (same as TextureMapper)
         const padding = 0.2;
@@ -64,7 +64,7 @@ export class FaceMeshGenerator {
         // Sample skin color
         const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
         
-        // Generate complete head with uniform scaling
+        // Generate complete head
         const headData = this.headGenerator.generateCompleteHead(
             landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
         );
@@ -117,8 +117,8 @@ export class FaceMeshGenerator {
         this.geometry.setIndex(indices);
         this.geometry.computeVertexNormals();
         
-        // Morph targets with uniform scaling
-        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, uniformScale, uniformScale, scaleZ, headData.vertices.length / 3);
+        // Morph targets with corrected width
+        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, correctedScaleX, scaleY, scaleZ, headData.vertices.length / 3);
         
         // Texture
         const texture = new THREE.CanvasTexture(textureCanvas);
@@ -213,7 +213,7 @@ export class FaceMeshGenerator {
         const multiplier = 0.1;
         
         landmarks.forEach((landmark, index) => {
-            // Use uniform scaling (scaleX and scaleY are now the same = uniformScale)
+            // Use correctedScaleX for X, scaleY for Y
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
             let z = -((landmark.z - centerZ) / scaleZ * 2);
