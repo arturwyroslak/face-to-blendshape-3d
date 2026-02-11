@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { FACEMESH_TESSELATION } from './face-mesh-triangulation.js';
-import { FACE_MESH_UVS } from './face-mesh-uvs.js';
 import { HeadGeometryGenerator } from './head-geometry-generator.js';
 
 const MORPH_TARGET_NAMES = [
@@ -27,6 +26,9 @@ export class FaceMeshGenerator {
     
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
         this.geometry = new THREE.BufferGeometry();
+        
+        const videoWidth = textureCanvas.width;
+        const videoHeight = textureCanvas.height;
         
         // Calculate bounds
         let minX = Infinity, maxX = -Infinity;
@@ -65,10 +67,14 @@ export class FaceMeshGenerator {
             headData.colors[i + 2] = sampledSkinColor.b;
         }
         
-        // Create UVs with proper MediaPipe coordinates - FLIP V axis
+        // Create UVs by projecting landmarks into texture space (like spite's setVideoUvs)
         const uvs = [];
-        FACE_MESH_UVS.forEach(uv => {
-            uvs.push(uv[0], 1.0 - uv[1]);  // Flip V coordinate
+        landmarks.forEach(landmark => {
+            // MediaPipe landmarks are normalized [0,1] relative to image dimensions
+            // Convert to texture UV space
+            const u = landmark.x;  // Already normalized
+            const v = 1.0 - landmark.y;  // Flip Y for texture coordinates
+            uvs.push(u, v);
         });
         
         // Back vertices dummy UVs
