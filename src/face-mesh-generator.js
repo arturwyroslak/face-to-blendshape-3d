@@ -55,23 +55,15 @@ export class FaceMeshGenerator {
         const scaleY = maxY - minY;
         const scaleZ = Math.max(scaleX, scaleY) * 2;
         
+        // Sample skin color from texture first
+        const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
+        
         // Generate complete head geometry
         const headData = this.headGenerator.generateCompleteHead(
             landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
         );
         
-        // Add top center vertex
-        const skinColor = { r: 0.95, g: 0.85, b: 0.75 };
-        const topVertex = this.headGenerator.addTopCenterVertex(
-            landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, skinColor
-        );
-        headData.vertices.push(topVertex.x, topVertex.y, topVertex.z);
-        headData.colors.push(topVertex.r, topVertex.g, topVertex.b);
-        
-        // Sample skin color from texture
-        const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
-        
-        // Update vertex colors with sampled skin color
+        // Update back vertex colors with sampled skin color
         const faceVertexCount = landmarks.length;
         for (let i = faceVertexCount * 3; i < headData.colors.length; i += 3) {
             headData.colors[i] = sampledSkinColor.r;
@@ -85,10 +77,10 @@ export class FaceMeshGenerator {
             uvs.push(landmark.x, 1.0 - landmark.y);
         });
         
-        // Back vertices have no texture
+        // Back vertices have dummy UVs (use vertex colors)
         const backVertexCount = headData.vertices.length / 3 - landmarks.length;
         for (let i = 0; i < backVertexCount; i++) {
-            uvs.push(0, 0); // Dummy UVs
+            uvs.push(0, 0);
         }
         
         // Store base vertices
@@ -116,8 +108,8 @@ export class FaceMeshGenerator {
         this.geometry.setIndex(indices);
         this.geometry.computeVertexNormals();
         
-        // Create morph targets
-        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ);
+        // Create morph targets (only for face vertices)
+        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, headData.vertices.length / 3);
         
         // Create texture
         const texture = new THREE.CanvasTexture(textureCanvas);
@@ -166,9 +158,9 @@ export class FaceMeshGenerator {
         const height = textureCanvas.height;
         
         // Sample from cheek area (approximate)
-        const sampleX = Math.floor(width * 0.3);
-        const sampleY = Math.floor(height * 0.4);
-        const sampleSize = 20;
+        const sampleX = Math.floor(width * 0.35);
+        const sampleY = Math.floor(height * 0.45);
+        const sampleSize = 30;
         
         try {
             const imageData = ctx.getImageData(sampleX, sampleY, sampleSize, sampleSize);
@@ -189,12 +181,13 @@ export class FaceMeshGenerator {
                 b: (b / count) / 255
             };
         } catch (e) {
+            console.warn('Failed to sample skin color:', e);
             // Fallback skin color
-            return { r: 0.95, g: 0.85, b: 0.75 };
+            return { r: 0.92, g: 0.82, b: 0.72 };
         }
     }
     
-    createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
+    createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount) {
         const morphTargets = [];
         const morphTargetNames = [];
         
@@ -208,7 +201,8 @@ export class FaceMeshGenerator {
                 centerZ, 
                 scaleX, 
                 scaleY, 
-                scaleZ
+                scaleZ,
+                totalVertexCount
             );
             
             morphTargets.push({
@@ -232,10 +226,11 @@ export class FaceMeshGenerator {
         this.geometry.userData.targetNames = morphTargetNames;
     }
     
-    calculateMorphTarget(landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
+    calculateMorphTarget(landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount) {
         const vertices = [];
         const multiplier = 0.1;
         
+        // Morph face vertices
         landmarks.forEach((landmark, index) => {
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
@@ -317,6 +312,17 @@ export class FaceMeshGenerator {
             
             vertices.push(x, y, z);
         });
+        
+        // Back vertices don't morph - copy from base geometry
+        const backVertexCount = totalVertexCount - landmarks.length;
+        for (let i = 0; i < backVertexCount; i++) {
+            const baseIdx = (landmarks.length + i) * 3;
+            vertices.push(
+                this.baseVertices[baseIdx],
+                this.baseVertices[baseIdx + 1],
+                this.baseVertices[baseIdx + 2]
+            );
+        }
         
         return Float32Array.from(vertices);
     }
