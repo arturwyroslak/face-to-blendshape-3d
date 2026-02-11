@@ -45,10 +45,11 @@ export class FaceMeshGenerator {
         const centerY = (minY + maxY) / 2;
         const centerZ = (minZ + maxZ) / 2;
         
-        // Use INDEPENDENT scaling per axis to preserve face proportions
+        // Independent scaling for X and Y to preserve face aspect ratio
+        // But use max(X,Y) for Z to maintain reasonable depth
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
-        const scaleZ = maxZ - minZ;  // Use actual Z range, not uniform scale
+        const scaleZ = Math.max(scaleX, scaleY) * 1.5;  // Keep reasonable Z depth
         
         // Calculate texture crop bounds (same as TextureMapper)
         const padding = 0.2;
