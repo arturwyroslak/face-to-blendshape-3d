@@ -238,7 +238,7 @@ class FaceToBlendshape3D {
                 const safeHeadHeight = headHeight || 2.0;
                 
                 const targetHeadWidth = safeFaceWidth * 2.15;
-                const targetHeadHeight = safeFaceHeight * 1.45;
+                const targetHeadHeight = safeFaceHeight * 2.45;
                 
                 const scaleX = targetHeadWidth / safeHeadWidth;
                 const scaleY = targetHeadHeight / safeHeadHeight;
