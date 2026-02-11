@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             display: grid;
             grid-template-columns: 1fr 2fr 1fr;
@@ -169,6 +169,7 @@
 
         #blendshapesPanel {
             display: none;
+            margin-bottom: 20px;
         }
 
         /* Debug Controls */
@@ -186,8 +187,24 @@
             font-size: 1.1em;
         }
 
+        .debug-subsection {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #764ba2;
+        }
+
+        .debug-subsection h4 {
+            color: #764ba2;
+            font-size: 0.95em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .slider-group {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .slider-group label {
@@ -195,7 +212,7 @@
             font-weight: 500;
             margin-bottom: 5px;
             color: #333;
-            font-size: 0.9em;
+            font-size: 0.85em;
         }
 
         .slider-group input[type="range"] {
@@ -209,7 +226,7 @@
             color: white;
             padding: 2px 8px;
             border-radius: 4px;
-            font-size: 0.85em;
+            font-size: 0.8em;
             font-weight: bold;
             min-width: 60px;
             text-align: center;
@@ -221,10 +238,11 @@
             border-radius: 4px;
             margin-top: 10px;
             font-family: monospace;
-            font-size: 0.85em;
+            font-size: 0.75em;
             white-space: pre-wrap;
-            max-height: 150px;
+            max-height: 200px;
             overflow-y: auto;
+            border: 1px solid #ddd;
         }
     </style>
 </head>
@@ -268,42 +286,82 @@
             <div class="debug-section">
                 <h3>🔧 Debug Controls</h3>
                 
-                <div class="slider-group">
-                    <label>Head Scale X: <span class="slider-value" id="scaleXValue">1.15</span></label>
-                    <input type="range" id="scaleXSlider" min="0.5" max="3.0" step="0.05" value="1.15">
+                <!-- HEAD CONTROLS -->
+                <div class="debug-subsection">
+                    <h4>👤 Head Model</h4>
+                    
+                    <div class="slider-group">
+                        <label>Scale X: <span class="slider-value" id="headScaleXValue">1.15</span></label>
+                        <input type="range" id="headScaleXSlider" min="0.5" max="3.0" step="0.05" value="1.15">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Scale Y: <span class="slider-value" id="headScaleYValue">1.45</span></label>
+                        <input type="range" id="headScaleYSlider" min="0.5" max="3.0" step="0.05" value="1.45">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Scale Z: <span class="slider-value" id="headScaleZValue">1.45</span></label>
+                        <input type="range" id="headScaleZSlider" min="0.5" max="3.0" step="0.05" value="1.45">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Position X: <span class="slider-value" id="headPosXValue">0.00</span></label>
+                        <input type="range" id="headPosXSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Position Y: <span class="slider-value" id="headPosYValue">0.00</span></label>
+                        <input type="range" id="headPosYSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Position Z: <span class="slider-value" id="headPosZValue">0.00</span></label>
+                        <input type="range" id="headPosZSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Push Back: <span class="slider-value" id="headPushBackValue">0.40</span></label>
+                        <input type="range" id="headPushBackSlider" min="0" max="1" step="0.05" value="0.40">
+                    </div>
                 </div>
 
-                <div class="slider-group">
-                    <label>Head Scale Y: <span class="slider-value" id="scaleYValue">1.45</span></label>
-                    <input type="range" id="scaleYSlider" min="0.5" max="3.0" step="0.05" value="1.45">
+                <!-- FACE CONTROLS -->
+                <div class="debug-subsection">
+                    <h4>😊 Face Mesh</h4>
+                    
+                    <div class="slider-group">
+                        <label>Scale X: <span class="slider-value" id="faceScaleXValue">1.00</span></label>
+                        <input type="range" id="faceScaleXSlider" min="0.5" max="2.0" step="0.05" value="1.00">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Scale Y: <span class="slider-value" id="faceScaleYValue">1.00</span></label>
+                        <input type="range" id="faceScaleYSlider" min="0.5" max="2.0" step="0.05" value="1.00">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Scale Z: <span class="slider-value" id="faceScaleZValue">1.00</span></label>
+                        <input type="range" id="faceScaleZSlider" min="0.5" max="2.0" step="0.05" value="1.00">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Position X: <span class="slider-value" id="facePosXValue">0.00</span></label>
+                        <input type="range" id="facePosXSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Position Y: <span class="slider-value" id="facePosYValue">0.00</span></label>
+                        <input type="range" id="facePosYSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>Position Z: <span class="slider-value" id="facePosZValue">0.00</span></label>
+                        <input type="range" id="facePosZSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
                 </div>
 
-                <div class="slider-group">
-                    <label>Head Scale Z: <span class="slider-value" id="scaleZValue">1.45</span></label>
-                    <input type="range" id="scaleZSlider" min="0.5" max="3.0" step="0.05" value="1.45">
-                </div>
-
-                <div class="slider-group">
-                    <label>Position X: <span class="slider-value" id="posXValue">0.00</span></label>
-                    <input type="range" id="posXSlider" min="-2" max="2" step="0.01" value="0">
-                </div>
-
-                <div class="slider-group">
-                    <label>Position Y: <span class="slider-value" id="posYValue">0.00</span></label>
-                    <input type="range" id="posYSlider" min="-2" max="2" step="0.01" value="0">
-                </div>
-
-                <div class="slider-group">
-                    <label>Position Z: <span class="slider-value" id="posZValue">0.00</span></label>
-                    <input type="range" id="posZSlider" min="-2" max="2" step="0.01" value="0">
-                </div>
-
-                <div class="slider-group">
-                    <label>Z Push Back Factor: <span class="slider-value" id="pushBackValue">0.40</span></label>
-                    <input type="range" id="pushBackSlider" min="0" max="1" step="0.05" value="0.40">
-                </div>
-
-                <button id="resetDebugBtn" style="background: #dc3545; margin-top: 10px;">Reset to Defaults</button>
+                <button id="resetDebugBtn" style="background: #dc3545; margin-top: 10px;">🔄 Reset to Defaults</button>
                 <button id="copyValuesBtn" style="background: #28a745;">📋 Copy Current Values</button>
 
                 <div class="debug-values" id="debugValues">Process an image to see debug values...</div>
