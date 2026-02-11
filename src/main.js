@@ -236,48 +236,56 @@ class FaceToBlendshape3D {
                 const headBox = new THREE.Box3().setFromObject(this.headModel);
                 const headWidth = headBox.max.x - headBox.min.x;
                 const headHeight = headBox.max.y - headBox.min.y;
-                const headDepth = headBox.max.z - headBox.min.z;
+                // Get Center of Head Model for alignment
+                const headCenter = headBox.getCenter(new THREE.Vector3());
                 
                 // 3. Calculate Scale Factors
-                // We assume the face covers roughly 70% of the head width (ear-to-ear is wider than face mesh)
-                // and roughly 60% of height.
-                // These factors need tuning based on the specific head.glb asset.
+                // Target width: 1.5x face width
                 const targetHeadWidth = faceWidth * 1.5; 
                 const targetHeadHeight = faceHeight * 1.8;
                 
                 const scaleX = targetHeadWidth / headWidth;
                 const scaleY = targetHeadHeight / headHeight;
-                
-                // Apply scale (Use max to ensure head covers face)
                 const uniformScale = Math.max(scaleX, scaleY);
-                // Allow some non-uniformity if requested, but uniform looks safer initially.
-                // User asked for "automatic widening/heightening", so let's try non-uniform if needed, 
-                // but usually uniform is better to preserve head shape.
-                // Let's stick to a slightly non-uniform approach to fit contact points best.
-                this.headModel.scale.set(scaleX, scaleY, uniformScale); 
                 
-                // 4. Position Head Model
-                // Align centers
-                const newHeadBox = new THREE.Box3().setFromObject(this.headModel);
-                const newHeadCenter = newHeadBox.getCenter(new THREE.Vector3());
+                this.headModel.scale.set(scaleX, scaleY, uniformScale);
+                this.headModel.updateMatrixWorld(true);
                 
-                // Offsets: 
-                // X: Align centers
-                const offsetX = faceCenter.x - newHeadCenter.x;
-                // Y: Align centers
-                const offsetY = faceCenter.y - newHeadCenter.y;
-                // Z: Head should be slightly behind face.
-                // Face is at Z ~ 0 to 0.5 (or -0.5 to 0.5 depending on gen).
-                // Head center is likely inside the head.
-                // We want the front surface of head to touch back of face.
-                // Let's align center Z first, then push back.
-                const offsetZ = faceCenter.z - newHeadCenter.z - (headDepth * uniformScale * 0.1); 
+                // 4. Apply Skin Color
+                const skinColor = this.faceMesh.userData.skinColor;
+                if (skinColor) {
+                    this.headModel.traverse((child) => {
+                        if (child.isMesh) {
+                            // Clone material to avoid sharing if multiple objects
+                            child.material = child.material.clone();
+                            child.material.color.setRGB(skinColor.r, skinColor.g, skinColor.b);
+                            child.material.map = null; // Remove existing texture
+                            child.material.needsUpdate = true;
+                        }
+                    });
+                }
+                
+                // 5. Position Head Model
+                // Re-measure after scaling
+                const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
+                const scaledHeadCenter = scaledHeadBox.getCenter(new THREE.Vector3());
+                
+                // Align centers X/Y
+                const offsetX = faceCenter.x - scaledHeadCenter.x;
+                const offsetY = faceCenter.y - scaledHeadCenter.y;
+                
+                // Align Z:
+                // We want the front of the head (max Z) to be slightly behind the face (min Z).
+                // Actually, the face is a mask, so its MinZ (ears/edges) should meet the Head MaxZ (ears/cheeks).
+                // Or rather, the Head should be behind.
+                // Let's place Head MaxZ at Face MinZ + slight overlap
+                const offsetZ = (faceBox.min.z - scaledHeadBox.max.z) + 0.1; // +0.1 overlap
                 
                 this.headModel.position.add(new THREE.Vector3(offsetX, offsetY, offsetZ));
                 
-                // Adjust order
-                this.faceMesh.renderOrder = 1;
-                this.headModel.renderOrder = 0;
+                // Render order
+                this.faceMesh.renderOrder = 2;
+                this.headModel.renderOrder = 1;
             }
             
             // Display blendshapes
