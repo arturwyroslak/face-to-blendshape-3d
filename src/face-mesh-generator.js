@@ -65,10 +65,10 @@ export class FaceMeshGenerator {
             headData.colors[i + 2] = sampledSkinColor.b;
         }
         
-        // Create UVs using MediaPipe's proper UV coordinates
+        // Create UVs with proper MediaPipe coordinates - FLIP V axis
         const uvs = [];
         FACE_MESH_UVS.forEach(uv => {
-            uvs.push(uv[0], uv[1]);
+            uvs.push(uv[0], 1.0 - uv[1]);  // Flip V coordinate
         });
         
         // Back vertices dummy UVs
