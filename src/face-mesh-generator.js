@@ -20,7 +20,7 @@ export class FaceMeshGenerator {
         this.geometry = null;
         this.material = null;
         this.mesh = null;
-        this.skinColor = { r: 0.9, g: 0.8, b: 0.7 }; // Default
+        this.skinColor = { r: 0.85, g: 0.75, b: 0.65 }; // Default warm skin tone
     }
     
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
@@ -54,8 +54,9 @@ export class FaceMeshGenerator {
         
         // 1.15 makes the face narrower
         const correctedScaleX = scaleX * 1.15;  
-        // Fix depth flattening: was 3.0, reducing to 1.5 to keep more depth
-        const scaleZ = Math.max(scaleX, scaleY) * 1.5; 
+        // Restore more depth: factor 1.8 (was 1.5, initially 3.0)
+        // 3.0 was too flat, 1.5 was better, 1.8 gives a bit more "nose" while keeping it round
+        const scaleZ = Math.max(scaleX, scaleY) * 1.8; 
         
         // Calculate texture crop bounds
         const padding = 0.2;
@@ -122,7 +123,7 @@ export class FaceMeshGenerator {
         this.material = new THREE.MeshStandardMaterial({
             map: texture,
             vertexColors: true,
-            roughness: 0.7,
+            roughness: 0.6, // Slightly smoother skin
             metalness: 0.0,
             side: THREE.DoubleSide, // Ensure visibility from all angles
             transparent: true, 
@@ -158,15 +159,16 @@ export class FaceMeshGenerator {
         const width = textureCanvas.width;
         const height = textureCanvas.height;
         
-        // Sample points: Forehead, Left Cheek, Right Cheek
-        // Avoid eyes/mouth/shadows
+        // Sample points: Forehead, Left Cheek, Right Cheek, Chin, Nose Bridge
         const points = [
             { x: width * 0.5, y: height * 0.25 }, // Forehead
             { x: width * 0.3, y: height * 0.55 }, // Left Cheek
-            { x: width * 0.7, y: height * 0.55 }  // Right Cheek
+            { x: width * 0.7, y: height * 0.55 }, // Right Cheek
+            { x: width * 0.5, y: height * 0.85 }, // Chin
+            { x: width * 0.5, y: height * 0.45 }  // Nose Bridge
         ];
         
-        const sampleSize = 10;
+        const sampleSize = 8;
         let totalR = 0, totalG = 0, totalB = 0, validSamples = 0;
         
         points.forEach(p => {
@@ -176,10 +178,14 @@ export class FaceMeshGenerator {
                 
                 let r = 0, g = 0, b = 0, count = 0;
                 for (let i = 0; i < data.length; i += 4) {
-                    r += data[i];
-                    g += data[i + 1];
-                    b += data[i + 2];
-                    count++;
+                    // Simple brightness check to avoid shadows/hair (assuming RGB)
+                    const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
+                    if (brightness > 60 && brightness < 240) { // Ignore too dark or too bright (specular)
+                        r += data[i];
+                        g += data[i + 1];
+                        b += data[i + 2];
+                        count++;
+                    }
                 }
                 
                 if (count > 0) {
@@ -193,7 +199,7 @@ export class FaceMeshGenerator {
             }
         });
 
-        if (validSamples === 0) return { r: 0.9, g: 0.8, b: 0.7 };
+        if (validSamples === 0) return { r: 0.85, g: 0.75, b: 0.65 };
 
         // Average and normalize
         return {
