@@ -23,10 +23,9 @@ export class FaceMeshGenerator {
     }
     
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
-        // Create geometry
         this.geometry = new THREE.BufferGeometry();
         
-        // Calculate bounds for normalization
+        // Calculate bounds
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
@@ -47,36 +46,32 @@ export class FaceMeshGenerator {
         const scaleY = maxY - minY;
         const scaleZ = Math.max(scaleX, scaleY) * 2;
         
-        // Create vertex positions from landmarks
+        // Create vertices with POSITIVE Z (face towards camera)
         const vertices = [];
         const uvs = [];
         
         landmarks.forEach((landmark) => {
-            // Normalize to centered coordinates
             const x = (landmark.x - centerX) / scaleX * 2;
             const y = -(landmark.y - centerY) / scaleY * 2;
-            const z = -((landmark.z - centerZ) / scaleZ * 2);
+            // POSITIVE Z for face towards camera (inverted from MediaPipe's convention)
+            const z = ((landmark.z - centerZ) / scaleZ * 2);
             
             vertices.push(x, y, z);
-            
-            // UV coordinates directly from landmark normalized coords
             uvs.push(landmark.x, 1.0 - landmark.y);
         });
         
         this.baseVertices = Float32Array.from(vertices);
         
-        // Set geometry attributes
         this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
         this.geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         
-        // Use MediaPipe's official triangulation with CORRECTED winding order
+        // Use MediaPipe triangulation AS-IS (don't reverse)
         const indices = [];
         for (let i = 0; i < FACEMESH_TESSELATION.length; i += 3) {
-            // Reverse winding order for correct face normals
             indices.push(
                 FACEMESH_TESSELATION[i],
-                FACEMESH_TESSELATION[i + 2],
-                FACEMESH_TESSELATION[i + 1]
+                FACEMESH_TESSELATION[i + 1],
+                FACEMESH_TESSELATION[i + 2]
             );
         }
         this.geometry.setIndex(indices);
@@ -92,16 +87,15 @@ export class FaceMeshGenerator {
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
         
-        // Create material
+        // Create material with FrontSide only
         this.material = new THREE.MeshStandardMaterial({
             map: texture,
             roughness: 0.7,
             metalness: 0.0,
-            side: THREE.DoubleSide, // Show both sides
+            side: THREE.FrontSide,
             flatShading: false
         });
         
-        // Create mesh
         this.mesh = new THREE.Mesh(this.geometry, this.material);
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
@@ -113,7 +107,6 @@ export class FaceMeshGenerator {
             }
         });
         
-        // Apply transformation matrix
         if (transformMatrix) {
             this.applyTransformMatrix(transformMatrix);
         }
@@ -150,9 +143,8 @@ export class FaceMeshGenerator {
         landmarks.forEach((landmark, index) => {
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
-            let z = -((landmark.z - centerZ) / scaleZ * 2);
+            let z = ((landmark.z - centerZ) / scaleZ * 2);
             
-            // Apply deformations based on blendshape
             switch(blendshapeName) {
                 case 'jawOpen':
                     if (y < 0) y -= multiplier * 0.5;
@@ -194,7 +186,7 @@ export class FaceMeshGenerator {
                 case 'cheekPuff':
                     if ([118, 347, 425, 205, 36, 266].includes(index)) {
                         x *= 1.15;
-                        z -= multiplier * 0.2;
+                        z += multiplier * 0.2;
                     }
                     break;
                 case 'noseSneerLeft':
@@ -204,7 +196,7 @@ export class FaceMeshGenerator {
                     if ([439, 279, 358].includes(index)) y += multiplier * 0.15;
                     break;
                 case 'jawForward':
-                    if (y < -0.2) z -= multiplier * 0.4;
+                    if (y < -0.2) z += multiplier * 0.4;
                     break;
                 case 'jawLeft':
                     if (y < -0.1) x -= multiplier * 0.3;
