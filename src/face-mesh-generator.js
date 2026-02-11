@@ -18,15 +18,16 @@ const MORPH_TARGET_NAMES = [
 export class FaceMeshGenerator {
     constructor() {
         this.baseVertices = null;
-        this.geometry = null;
-        this.material = null;
+        this.faceGeometry = null;
+        this.backGeometry = null;
+        this.faceMaterial = null;
+        this.backMaterial = null;
         this.mesh = null;
         this.headGenerator = new HeadGeometryGenerator();
     }
     
     generateWithMorphTargets(landmarks, blendshapes, transformMatrix, textureCanvas) {
-        this.geometry = new THREE.BufferGeometry();
-        
+        // Calculate bounds
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
@@ -47,77 +48,153 @@ export class FaceMeshGenerator {
         const scaleY = maxY - minY;
         const scaleZ = Math.max(scaleX, scaleY) * 2;
         
+        // Sample skin color
         const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
+        
+        // Generate complete head data
         const headData = this.headGenerator.generateCompleteHead(
             landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
         );
         
-        // Update back colors
-        const faceVertexCount = landmarks.length;
-        for (let i = faceVertexCount * 3; i < headData.colors.length; i += 3) {
-            headData.colors[i] = sampledSkinColor.r;
-            headData.colors[i + 1] = sampledSkinColor.g;
-            headData.colors[i + 2] = sampledSkinColor.b;
-        }
+        // Create FACE geometry (only face vertices)
+        this.faceGeometry = new THREE.BufferGeometry();
         
-        // UVs
-        const uvs = [];
-        landmarks.forEach(landmark => {
-            uvs.push(landmark.x, 1.0 - landmark.y);
+        const faceVertices = [];
+        const faceUVs = [];
+        
+        landmarks.forEach((landmark, index) => {
+            const x = (landmark.x - centerX) / scaleX * 2;
+            const y = -(landmark.y - centerY) / scaleY * 2;
+            const z = -((landmark.z - centerZ) / scaleZ * 2);
+            
+            faceVertices.push(x, y, z);
+            faceUVs.push(landmark.x, 1.0 - landmark.y);
         });
         
-        const backVertexCount = headData.vertices.length / 3 - landmarks.length;
-        for (let i = 0; i < backVertexCount; i++) {
-            uvs.push(0, 0);
-        }
+        this.faceGeometry.setAttribute('position', new THREE.Float32BufferAttribute(faceVertices, 3));
+        this.faceGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(faceUVs, 2));
         
-        this.baseVertices = Float32Array.from(headData.vertices);
-        
-        // Triangulation
-        const indices = [];
+        // Face triangulation (reversed winding)
+        const faceIndices = [];
         for (let i = 0; i < FACEMESH_TESSELATION.length; i += 3) {
-            indices.push(
+            faceIndices.push(
                 FACEMESH_TESSELATION[i],
                 FACEMESH_TESSELATION[i + 2],
                 FACEMESH_TESSELATION[i + 1]
             );
         }
-        headData.backTriangulation.forEach(idx => indices.push(idx));
+        this.faceGeometry.setIndex(faceIndices);
+        this.faceGeometry.computeVertexNormals();
         
-        // Set attributes
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(headData.vertices, 3));
-        this.geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-        this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(headData.colors, 3));
-        this.geometry.setIndex(indices);
-        this.geometry.computeVertexNormals();
-        
-        // Morph targets
-        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, headData.vertices.length / 3);
-        
-        // Texture
+        // Create texture
         const texture = new THREE.CanvasTexture(textureCanvas);
         texture.needsUpdate = true;
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
         
-        // Material
-        this.material = new THREE.MeshStandardMaterial({
+        // Face material with texture
+        this.faceMaterial = new THREE.MeshStandardMaterial({
             map: texture,
+            roughness: 0.7,
+            metalness: 0.0,
+            side: THREE.FrontSide
+        });
+        
+        // Create BACK geometry (only back vertices)
+        this.backGeometry = new THREE.BufferGeometry();
+        
+        const backVertices = [];
+        const backColors = [];
+        
+        // Extract back vertices from headData
+        const faceVertexCount = landmarks.length;
+        const backVertexCount = (headData.vertices.length / 3) - faceVertexCount;
+        
+        for (let i = 0; i < backVertexCount; i++) {
+            const idx = (faceVertexCount + i) * 3;
+            backVertices.push(
+                headData.vertices[idx],
+                headData.vertices[idx + 1],
+                headData.vertices[idx + 2]
+            );
+            backColors.push(
+                sampledSkinColor.r,
+                sampledSkinColor.g,
+                sampledSkinColor.b
+            );
+        }
+        
+        this.backGeometry.setAttribute('position', new THREE.Float32BufferAttribute(backVertices, 3));
+        this.backGeometry.setAttribute('color', new THREE.Float32BufferAttribute(backColors, 3));
+        
+        // Adjust back triangulation indices (subtract face vertex count)
+        const backIndices = headData.backTriangulation.map(idx => {
+            if (idx >= faceVertexCount) {
+                return idx - faceVertexCount;
+            }
+            return idx; // Keep face indices as-is for connection
+        });
+        
+        // Actually we need to handle this differently
+        // Back triangulation connects face to back, so we need to split it
+        const pureBackIndices = [];
+        
+        // Only include triangles that are purely in the back
+        // This is complex - let's regenerate back triangulation properly
+        const backSegments = headData.backSegments || 30;
+        const backRings = headData.backRings || 5;
+        
+        // Generate triangulation for back only (not connecting to face)
+        for (let ring = 0; ring < backRings; ring++) {
+            for (let seg = 0; seg < backSegments; seg++) {
+                const current = ring * backSegments + seg;
+                const next = ring * backSegments + ((seg + 1) % backSegments);
+                const below = (ring + 1) * backSegments + seg;
+                const belowNext = (ring + 1) * backSegments + ((seg + 1) % backSegments);
+                
+                if (ring < backRings - 1) {
+                    pureBackIndices.push(current, next, below);
+                    pureBackIndices.push(next, belowNext, below);
+                }
+            }
+        }
+        
+        this.backGeometry.setIndex(pureBackIndices);
+        this.backGeometry.computeVertexNormals();
+        
+        // Back material with vertex colors
+        this.backMaterial = new THREE.MeshStandardMaterial({
             vertexColors: true,
             roughness: 0.7,
             metalness: 0.0,
-            side: THREE.DoubleSide,
-            flatShading: false
+            side: THREE.DoubleSide
         });
         
-        this.mesh = new THREE.Mesh(this.geometry, this.material);
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
+        // Create group to hold both meshes
+        this.mesh = new THREE.Group();
         
+        const faceMesh = new THREE.Mesh(this.faceGeometry, this.faceMaterial);
+        const backMesh = new THREE.Mesh(this.backGeometry, this.backMaterial);
+        
+        faceMesh.castShadow = true;
+        faceMesh.receiveShadow = true;
+        backMesh.castShadow = true;
+        backMesh.receiveShadow = true;
+        
+        this.mesh.add(faceMesh);
+        this.mesh.add(backMesh);
+        
+        // Store for morph targets
+        this.baseVertices = Float32Array.from(faceVertices);
+        
+        // Create morph targets for face
+        this.createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ);
+        
+        // Apply morph target influences
         Object.entries(blendshapes).forEach(([name, value], index) => {
-            if (this.mesh.morphTargetInfluences && index < this.mesh.morphTargetInfluences.length) {
-                this.mesh.morphTargetInfluences[index] = value;
+            if (faceMesh.morphTargetInfluences && index < faceMesh.morphTargetInfluences.length) {
+                faceMesh.morphTargetInfluences[index] = value;
             }
         });
         
@@ -160,13 +237,13 @@ export class FaceMeshGenerator {
         }
     }
     
-    createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount) {
+    createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
         const morphTargets = [];
         const morphTargetNames = [];
         
         MORPH_TARGET_NAMES.forEach(blendshapeName => {
             const morphPositions = this.calculateMorphTarget(
-                landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount
+                landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
             );
             
             morphTargets.push({ name: blendshapeName, vertices: morphPositions });
@@ -174,15 +251,15 @@ export class FaceMeshGenerator {
         });
         
         morphTargets.forEach((target, index) => {
-            this.geometry.morphAttributes.position = this.geometry.morphAttributes.position || [];
-            this.geometry.morphAttributes.position[index] = new THREE.Float32BufferAttribute(target.vertices, 3);
+            this.faceGeometry.morphAttributes.position = this.faceGeometry.morphAttributes.position || [];
+            this.faceGeometry.morphAttributes.position[index] = new THREE.Float32BufferAttribute(target.vertices, 3);
         });
         
-        this.geometry.morphTargetsRelative = false;
-        this.geometry.userData.targetNames = morphTargetNames;
+        this.faceGeometry.morphTargetsRelative = false;
+        this.faceGeometry.userData.targetNames = morphTargetNames;
     }
     
-    calculateMorphTarget(landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ, totalVertexCount) {
+    calculateMorphTarget(landmarks, blendshapeName, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
         const vertices = [];
         const multiplier = 0.1;
         
@@ -212,17 +289,6 @@ export class FaceMeshGenerator {
             vertices.push(x, y, z);
         });
         
-        // Back vertices don't morph
-        const backVertexCount = totalVertexCount - landmarks.length;
-        for (let i = 0; i < backVertexCount; i++) {
-            const baseIdx = (landmarks.length + i) * 3;
-            vertices.push(
-                this.baseVertices[baseIdx],
-                this.baseVertices[baseIdx + 1],
-                this.baseVertices[baseIdx + 2]
-            );
-        }
-        
         return Float32Array.from(vertices);
     }
     
@@ -241,10 +307,12 @@ export class FaceMeshGenerator {
     }
     
     dispose() {
-        if (this.geometry) this.geometry.dispose();
-        if (this.material) {
-            if (this.material.map) this.material.map.dispose();
-            this.material.dispose();
+        if (this.faceGeometry) this.faceGeometry.dispose();
+        if (this.backGeometry) this.backGeometry.dispose();
+        if (this.faceMaterial) {
+            if (this.faceMaterial.map) this.faceMaterial.map.dispose();
+            this.faceMaterial.dispose();
         }
+        if (this.backMaterial) this.backMaterial.dispose();
     }
 }

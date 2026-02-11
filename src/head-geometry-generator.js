@@ -37,13 +37,15 @@ export class HeadGeometryGenerator {
             vertices,
             colors,
             backTriangulation,
+            backSegments: backData.segments,
+            backRings: backData.rings,
             vertexCount: vertices.length / 3
         };
     }
     
     createEllipsoidBack(faceLandmarks, silhouette, skinColor, cx, cy, cz, sx, sy, sz) {
         const vertices = [];
-        const segments = silhouette.length;
+        const segments = 30;
         const rings = 5;
         
         // Calculate head dimensions
@@ -79,7 +81,7 @@ export class HeadGeometryGenerator {
         for (let i = 0; i < silhouette.length; i++) {
             const faceIdx = silhouette[i];
             const nextFaceIdx = silhouette[(i + 1) % silhouette.length];
-            const backIdx = startIdx + i;
+            const backIdx = startIdx + i % segments;
             const nextBackIdx = startIdx + ((i + 1) % segments);
             
             indices.push(faceIdx, nextFaceIdx, backIdx);
