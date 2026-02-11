@@ -51,7 +51,7 @@ export class FaceMeshGenerator {
         // Sample skin color
         const sampledSkinColor = this.sampleSkinColorFromTexture(textureCanvas);
         
-        // Generate complete head
+        // Generate complete head - NEGATIVE Z like spite does
         const headData = this.headGenerator.generateCompleteHead(
             landmarks, centerX, centerY, centerZ, scaleX, scaleY, scaleZ
         );
@@ -86,7 +86,7 @@ export class FaceMeshGenerator {
         // Triangulation - face + back
         const indices = [];
         
-        // Face triangulation (direct - no reverse)
+        // Face triangulation - NO REVERSE! spite uses original order
         for (let i = 0; i < FACEMESH_TESSELATION.length; i += 3) {
             indices.push(
                 FACEMESH_TESSELATION[i],
@@ -144,7 +144,7 @@ export class FaceMeshGenerator {
         const height = textureCanvas.height;
         
         const sampleX = Math.floor(width * 0.35);
-        const sampleY = Math.floor(height * 0.45);
+        const sampleY = Math.floor(width * 0.45);
         const sampleSize = 30;
         
         try {
@@ -199,7 +199,7 @@ export class FaceMeshGenerator {
         landmarks.forEach((landmark, index) => {
             let x = (landmark.x - centerX) / scaleX * 2;
             let y = -(landmark.y - centerY) / scaleY * 2;
-            let z = ((landmark.z - centerZ) / scaleZ * 2);  // POSITIVE
+            let z = -((landmark.z - centerZ) / scaleZ * 2);  // NEGATIVE Z like spite!
             
             switch(blendshapeName) {
                 case 'jawOpen':
