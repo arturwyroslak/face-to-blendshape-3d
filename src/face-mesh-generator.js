@@ -49,7 +49,12 @@ export class FaceMeshGenerator {
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
         const correctedScaleX = scaleX * 1.08;  // 8% narrower
-        const scaleZ = Math.max(scaleX, scaleY);  // Z uses max for proper depth
+        
+        // Z Depth Correction:
+        // We DIVIDE by scaleZ. To reduce depth (make it flatter), we need a LARGER scaleZ.
+        // MediaPipe Z values are small, so we need a large divisor to keep them contained.
+        // Increasing from 1.0 to 3.0 to significantly flatten the face.
+        const scaleZ = Math.max(scaleX, scaleY) * 3.0; 
         
         // Calculate texture crop bounds (same as TextureMapper)
         const padding = 0.2;
