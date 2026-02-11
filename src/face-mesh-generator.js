@@ -28,6 +28,7 @@ export class FaceMeshGenerator {
         
         // Sample skin color for external use (Head Model)
         this.skinColor = this.sampleSkinColorFromTexture(textureCanvas);
+        console.log('Sampled Skin Color:', this.skinColor);
         
         // Calculate bounds for geometry AND UV mapping
         let minX = Infinity, maxX = -Infinity;
@@ -47,13 +48,14 @@ export class FaceMeshGenerator {
         const centerY = (minY + maxY) / 2;
         const centerZ = (minZ + maxZ) / 2;
         
-        // Independent X/Y scaling with STRONGER width correction
+        // Independent X/Y scaling with width correction
         const scaleX = maxX - minX;
         const scaleY = maxY - minY;
         
-        // 1.15 makes the face narrower (dividing by a larger number)
+        // 1.15 makes the face narrower
         const correctedScaleX = scaleX * 1.15;  
-        const scaleZ = Math.max(scaleX, scaleY) * 3.0; // Flattened depth
+        // Fix depth flattening: was 3.0, reducing to 1.5 to keep more depth
+        const scaleZ = Math.max(scaleX, scaleY) * 1.5; 
         
         // Calculate texture crop bounds
         const padding = 0.2;
@@ -122,9 +124,9 @@ export class FaceMeshGenerator {
             vertexColors: true,
             roughness: 0.7,
             metalness: 0.0,
-            side: THREE.FrontSide,
-            transparent: true, // Enable transparency for blending
-            alphaTest: 0.1     // Discard transparent pixels
+            side: THREE.DoubleSide, // Ensure visibility from all angles
+            transparent: true, 
+            alphaTest: 0.1     
         });
         
         this.mesh = new THREE.Mesh(this.geometry, this.material);
@@ -156,35 +158,49 @@ export class FaceMeshGenerator {
         const width = textureCanvas.width;
         const height = textureCanvas.height;
         
-        // Sample from center-ish cheeks/forehead
-        const sampleX = Math.floor(width * 0.5); 
-        const sampleY = Math.floor(height * 0.4); 
-        const sampleSize = 20;
+        // Sample points: Forehead, Left Cheek, Right Cheek
+        // Avoid eyes/mouth/shadows
+        const points = [
+            { x: width * 0.5, y: height * 0.25 }, // Forehead
+            { x: width * 0.3, y: height * 0.55 }, // Left Cheek
+            { x: width * 0.7, y: height * 0.55 }  // Right Cheek
+        ];
         
-        try {
-            const imageData = ctx.getImageData(sampleX, sampleY, sampleSize, sampleSize);
-            const data = imageData.data;
-            
-            let r = 0, g = 0, b = 0, count = 0;
-            
-            for (let i = 0; i < data.length; i += 4) {
-                r += data[i];
-                g += data[i + 1];
-                b += data[i + 2];
-                count++;
+        const sampleSize = 10;
+        let totalR = 0, totalG = 0, totalB = 0, validSamples = 0;
+        
+        points.forEach(p => {
+            try {
+                const imageData = ctx.getImageData(p.x, p.y, sampleSize, sampleSize);
+                const data = imageData.data;
+                
+                let r = 0, g = 0, b = 0, count = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    r += data[i];
+                    g += data[i + 1];
+                    b += data[i + 2];
+                    count++;
+                }
+                
+                if (count > 0) {
+                    totalR += r / count;
+                    totalG += g / count;
+                    totalB += b / count;
+                    validSamples++;
+                }
+            } catch (e) {
+                console.warn('Point sample failed', e);
             }
-            
-            if (count === 0) return { r: 0.9, g: 0.8, b: 0.7 };
+        });
 
-            return {
-                r: (r / count) / 255,
-                g: (g / count) / 255,
-                b: (b / count) / 255
-            };
-        } catch (e) {
-            console.warn('Skin sample failed', e);
-            return { r: 0.92, g: 0.82, b: 0.72 };
-        }
+        if (validSamples === 0) return { r: 0.9, g: 0.8, b: 0.7 };
+
+        // Average and normalize
+        return {
+            r: (totalR / validSamples) / 255,
+            g: (totalG / validSamples) / 255,
+            b: (totalB / validSamples) / 255
+        };
     }
     
     createMorphTargets(landmarks, blendshapes, centerX, centerY, centerZ, scaleX, scaleY, scaleZ) {
