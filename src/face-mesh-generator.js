@@ -54,9 +54,9 @@ export class FaceMeshGenerator {
         
         // 1.15 makes the face narrower
         const correctedScaleX = scaleX * 1.15;  
-        // Restore more depth: factor 1.8 (was 1.5, initially 3.0)
-        // 3.0 was too flat, 1.5 was better, 1.8 gives a bit more "nose" while keeping it round
-        const scaleZ = Math.max(scaleX, scaleY) * 1.8; 
+        // Fix depth flattening: 0.6 factor (was 1.8). 
+        // Smaller divisor = larger Z values = more depth.
+        const scaleZ = Math.max(scaleX, scaleY) * 0.6; 
         
         // Calculate texture crop bounds
         const padding = 0.2;
@@ -123,7 +123,7 @@ export class FaceMeshGenerator {
         this.material = new THREE.MeshStandardMaterial({
             map: texture,
             vertexColors: true,
-            roughness: 0.6, // Slightly smoother skin
+            roughness: 0.5, // Smoother skin
             metalness: 0.0,
             side: THREE.DoubleSide, // Ensure visibility from all angles
             transparent: true, 
