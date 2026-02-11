@@ -6,6 +6,8 @@ import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { ARKitBlendshapeMapper } from './arkit-mapper.js';
 import { FaceMeshGenerator } from './face-mesh-generator.js';
 import { TextureMapper } from './texture-mapper.js';
+// Import head model as URL to ensure Vite bundles it
+import headModelUrl from '../head.glb?url';
 
 class FaceToBlendshape3D {
     constructor() {
@@ -93,9 +95,11 @@ class FaceToBlendshape3D {
         backLight.position.set(0, 0, -1);
         this.scene.add(backLight);
         
-        // Load Head Model
+        // Load Head Model using imported URL
         const loader = new GLTFLoader();
-        loader.load('./head.glb', (gltf) => {
+        console.log('Loading head model from:', headModelUrl);
+        
+        loader.load(headModelUrl, (gltf) => {
             this.headModel = gltf.scene;
             
             // Debug: Log model structure
@@ -114,6 +118,8 @@ class FaceToBlendshape3D {
             console.log('Head model added to scene (hidden)');
         }, undefined, (error) => {
             console.error('An error occurred loading the head model:', error);
+            // More descriptive error
+            this.showStatus('Failed to load head model. Check console.', 'error');
         });
 
         // Handle resize
