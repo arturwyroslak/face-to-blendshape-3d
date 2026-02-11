@@ -75,32 +75,33 @@ class FaceToBlendshape3D {
         this.controls = new OrbitControls(this.camera, canvas);
         this.controls.enableDamping = true;
 
+        // Oświetlenie
         const ambient = new THREE.AmbientLight(0xffffff, 0.9);
         this.scene.add(ambient);
-
         const front = new THREE.DirectionalLight(0xffffff, 1.0);
         front.position.set(0, 0, 5);
         this.scene.add(front);
-
         const top = new THREE.DirectionalLight(0xffffff, 0.8);
         top.position.set(0, 5, 0);
         this.scene.add(top);
 
+        // Ładowanie modelu głowy
         const loader = new GLTFLoader();
-
         loader.load(headModelUrl, (gltf) => {
             this.headModel = gltf.scene;
 
+            // Ustawienie materiału dla głowy (baza)
             this.headModel.traverse((child) => {
                 if (child.isMesh) {
                     child.material = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(0.8, 0.6, 0.5),
-                        roughness: 0.6,
+                        color: new THREE.Color(0.85, 0.65, 0.55), // Bardziej naturalny kolor skóry
+                        roughness: 0.5,
                         metalness: 0.0
                     });
                 }
             });
 
+            // Wyśrodkowanie modelu głowy względem jego własnego pivotu
             const box = new THREE.Box3().setFromObject(this.headModel);
             const center = box.getCenter(new THREE.Vector3());
             this.headModel.position.sub(center);
@@ -131,7 +132,6 @@ class FaceToBlendshape3D {
 
     loadImage(file) {
         const reader = new FileReader();
-
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
@@ -140,7 +140,6 @@ class FaceToBlendshape3D {
             };
             img.src = e.target.result;
         };
-
         reader.readAsDataURL(file);
     }
 
@@ -148,13 +147,13 @@ class FaceToBlendshape3D {
         if (!this.currentImage) return;
 
         const results = this.faceLandmarker.detect(this.currentImage);
-
         if (!results.faceLandmarks?.length) return;
 
         const landmarks = results.faceLandmarks[0];
         const blendshapes = results.faceBlendshapes?.[0]?.categories || [];
         const transformMatrix = results.facialTransformationMatrixes?.[0];
 
+        // 1. Generowanie blendshapes i tekstury
         const mapper = new ARKitBlendshapeMapper();
         this.blendshapes = mapper.mapMediaPipeToARKit(blendshapes, landmarks);
 
@@ -164,6 +163,7 @@ class FaceToBlendshape3D {
             landmarks
         );
 
+        // 2. Generowanie siatki twarzy (maski)
         const meshGenerator = new FaceMeshGenerator();
         this.faceMesh = meshGenerator.generateWithMorphTargets(
             landmarks,
@@ -172,60 +172,92 @@ class FaceToBlendshape3D {
             this.textureCanvas
         );
 
+        // Usunięcie starej siatki jeśli istnieje
+        const oldMesh = this.scene.getObjectByName('faceMesh');
+        if (oldMesh) this.scene.remove(oldMesh);
+
         this.faceMesh.name = 'faceMesh';
         this.scene.add(this.faceMesh);
 
-        // 🔥 1️⃣ LEKKIE ZWĘŻENIE TWARZY
-        const FACE_NARROW_SCALE = 0.93;
-        this.faceMesh.scale.x *= FACE_NARROW_SCALE;
+        // =========================================================
+        // 🔥 TU SĄ GŁÓWNE ZMIANY DO SKALOWANIA 🔥
+        // =========================================================
+
+        // Krok A: Zwężenie samej maski twarzy (zgodnie z życzeniem)
+        this.faceMesh.scale.x = 0.92; // Lekkie zwężenie
         this.faceMesh.updateMatrixWorld(true);
 
-        // 🔥 2️⃣ DYNAMICZNE DOPASOWANIE GŁOWY DO REALNEJ SZEROKOŚCI TWARZY
         if (this.headModel) {
             this.headModel.visible = true;
 
-            // landmarki policzków
-            const left = landmarks[234];
-            const right = landmarks[454];
-
-            // szerokość twarzy w przestrzeni modelu
-            const faceWidth = Math.abs(left.x - right.x) * this.faceMesh.scale.x;
-
-            // szerokość głowy
-            const headBox = new THREE.Box3().setFromObject(this.headModel);
-            const headWidth = headBox.max.x - headBox.min.x;
-
-            // skalowanie jednolite
-            const scale = (faceWidth * 1.15) / headWidth;
-
-            this.headModel.scale.set(scale, scale, scale);
-            this.headModel.updateMatrixWorld(true);
-
-            // 🔥 3️⃣ WYŚRODKOWANIE GŁOWY DO TWARZY
+            // 1. Obliczamy wymiary pudełka (Bounding Box) twarzy
             this.faceMesh.geometry.computeBoundingBox();
             const faceBox = this.faceMesh.geometry.boundingBox;
-            const faceCenter = faceBox.getCenter(new THREE.Vector3());
+            const faceSize = new THREE.Vector3();
+            faceBox.getSize(faceSize);
+            const faceCenter = new THREE.Vector3();
+            faceBox.getCenter(faceCenter); // Pobieramy środek twarzy
 
-            const newHeadBox = new THREE.Box3().setFromObject(this.headModel);
-            const headCenter = newHeadBox.getCenter(new THREE.Vector3());
-            const headDepth =
-                newHeadBox.max.z - newHeadBox.min.z;
+            // Zastosowanie skali obiektu do wymiarów z geometrii
+            const faceWidthWorld = faceSize.x * this.faceMesh.scale.x;
+            const faceHeightWorld = faceSize.y * this.faceMesh.scale.y;
 
-            const offset = new THREE.Vector3().subVectors(
-                faceCenter,
-                headCenter
-            );
+            // 2. Obliczamy wymiary pudełka głowy (nieprzeskalowanej)
+            // Resetujemy skalę głowy na chwilę, żeby pobrać czyste wymiary
+            this.headModel.scale.set(1, 1, 1);
+            this.headModel.updateMatrixWorld(true);
+            
+            const headBox = new THREE.Box3().setFromObject(this.headModel);
+            const headSize = new THREE.Vector3();
+            headBox.getSize(headSize);
 
-            // lekkie cofnięcie dla wtapiania
-            offset.z -= headDepth * 0.28;
+            // 3. Obliczamy potrzebną skalę
+            // Chcemy, żeby głowa była znacznie szersza niż sama maska twarzy (np. 2.2 razy szersza),
+            // ponieważ maska to tylko przód, a głowa musi obejmować całość.
+            // Poprzednio ten mnożnik był za mały (1.15), dlatego głowa była malutka.
+            const widthRatio = (faceWidthWorld * 2.3) / headSize.x;
+            const heightRatio = (faceHeightWorld * 1.5) / headSize.y; // Mniejszy mnożnik na wysokość
 
+            // Wybieramy większą skalę, żeby głowa nie była za mała w żadnym wymiarze
+            const targetScale = Math.max(widthRatio, heightRatio);
+
+            console.log("Skala głowy:", targetScale); // Debug
+
+            this.headModel.scale.set(targetScale, targetScale, targetScale);
+            this.headModel.updateMatrixWorld(true);
+
+            // 4. Pozycjonowanie
+            // Ustawiamy głowę w centrum twarzy
+            const scaledHeadBox = new THREE.Box3().setFromObject(this.headModel);
+            const scaledHeadCenter = new THREE.Vector3();
+            scaledHeadBox.getCenter(scaledHeadCenter);
+
+            const offset = new THREE.Vector3().subVectors(faceCenter, scaledHeadCenter);
             this.headModel.position.add(offset);
 
-            // minimalne wysunięcie twarzy (brak z-fighting)
-            this.faceMesh.position.z += 0.01;
+            // 5. Korekta głębokości (Z) - kluczowe dla wtapiania
+            // Przesuwamy głowę w tył względem twarzy, ale nie za daleko.
+            // Im mniejsza wartość odejmowana, tym głowa jest "bliżej" przodu twarzy.
+            const scaledHeadDepth = scaledHeadBox.max.z - scaledHeadBox.min.z;
+            
+            // Przesuwamy głowę tak, żeby jej środek był nieco za twarzą.
+            // Wartość 0.15 jest eksperymentalna - reguluje jak bardzo uszy/tył głowy wystają.
+            this.headModel.position.z += scaledHeadDepth * 0.15; 
 
+            // Upewniamy się, że twarz jest zawsze przed głową w kolejności renderowania
             this.faceMesh.renderOrder = 2;
             this.headModel.renderOrder = 1;
+
+            // Opcjonalnie: Próbujemy dopasować kolor głowy do średniego koloru twarzy
+            // (Jeśli w faceMesh.userData zapisałeś kolor skóry w generatorze)
+            if (this.faceMesh.userData.skinColor) {
+                 const sc = this.faceMesh.userData.skinColor;
+                 this.headModel.traverse((child) => {
+                    if(child.isMesh) {
+                        child.material.color.setRGB(sc.r, sc.g, sc.b);
+                    }
+                 });
+            }
         }
 
         document.getElementById('exportBtn').disabled = false;
