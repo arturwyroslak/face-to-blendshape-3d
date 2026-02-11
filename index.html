@@ -238,11 +238,21 @@
             border-radius: 4px;
             margin-top: 10px;
             font-family: monospace;
-            font-size: 0.75em;
+            font-size: 0.7em;
             white-space: pre-wrap;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
             border: 1px solid #ddd;
+        }
+
+        .control-group-label {
+            font-size: 0.8em;
+            color: #666;
+            font-weight: 600;
+            margin-top: 10px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
     </style>
 </head>
@@ -290,34 +300,46 @@
                 <div class="debug-subsection">
                     <h4>👤 Head Model</h4>
                     
+                    <div class="control-group-label">Scale</div>
                     <div class="slider-group">
-                        <label>Scale X: <span class="slider-value" id="headScaleXValue">1.15</span></label>
+                        <label>X: <span class="slider-value" id="headScaleXValue">1.15</span></label>
                         <input type="range" id="headScaleXSlider" min="0.5" max="3.0" step="0.05" value="1.15">
                     </div>
-
                     <div class="slider-group">
-                        <label>Scale Y: <span class="slider-value" id="headScaleYValue">1.45</span></label>
+                        <label>Y: <span class="slider-value" id="headScaleYValue">1.45</span></label>
                         <input type="range" id="headScaleYSlider" min="0.5" max="3.0" step="0.05" value="1.45">
                     </div>
-
                     <div class="slider-group">
-                        <label>Scale Z: <span class="slider-value" id="headScaleZValue">1.45</span></label>
+                        <label>Z: <span class="slider-value" id="headScaleZValue">1.45</span></label>
                         <input type="range" id="headScaleZSlider" min="0.5" max="3.0" step="0.05" value="1.45">
                     </div>
 
+                    <div class="control-group-label">Position</div>
                     <div class="slider-group">
-                        <label>Position X: <span class="slider-value" id="headPosXValue">0.00</span></label>
+                        <label>X: <span class="slider-value" id="headPosXValue">0.00</span></label>
                         <input type="range" id="headPosXSlider" min="-2" max="2" step="0.01" value="0">
                     </div>
-
                     <div class="slider-group">
-                        <label>Position Y: <span class="slider-value" id="headPosYValue">0.00</span></label>
+                        <label>Y: <span class="slider-value" id="headPosYValue">0.00</span></label>
                         <input type="range" id="headPosYSlider" min="-2" max="2" step="0.01" value="0">
                     </div>
-
                     <div class="slider-group">
-                        <label>Position Z: <span class="slider-value" id="headPosZValue">0.00</span></label>
+                        <label>Z: <span class="slider-value" id="headPosZValue">0.00</span></label>
                         <input type="range" id="headPosZSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
+
+                    <div class="control-group-label">Rotation (degrees)</div>
+                    <div class="slider-group">
+                        <label>X (Pitch): <span class="slider-value" id="headRotXValue">0°</span></label>
+                        <input type="range" id="headRotXSlider" min="-180" max="180" step="1" value="0">
+                    </div>
+                    <div class="slider-group">
+                        <label>Y (Yaw): <span class="slider-value" id="headRotYValue">0°</span></label>
+                        <input type="range" id="headRotYSlider" min="-180" max="180" step="1" value="0">
+                    </div>
+                    <div class="slider-group">
+                        <label>Z (Roll): <span class="slider-value" id="headRotZValue">0°</span></label>
+                        <input type="range" id="headRotZSlider" min="-180" max="180" step="1" value="0">
                     </div>
 
                     <div class="slider-group">
@@ -330,34 +352,46 @@
                 <div class="debug-subsection">
                     <h4>😊 Face Mesh</h4>
                     
+                    <div class="control-group-label">Scale</div>
                     <div class="slider-group">
-                        <label>Scale X: <span class="slider-value" id="faceScaleXValue">1.00</span></label>
+                        <label>X: <span class="slider-value" id="faceScaleXValue">1.00</span></label>
                         <input type="range" id="faceScaleXSlider" min="0.5" max="2.0" step="0.05" value="1.00">
                     </div>
-
                     <div class="slider-group">
-                        <label>Scale Y: <span class="slider-value" id="faceScaleYValue">1.00</span></label>
+                        <label>Y: <span class="slider-value" id="faceScaleYValue">1.00</span></label>
                         <input type="range" id="faceScaleYSlider" min="0.5" max="2.0" step="0.05" value="1.00">
                     </div>
-
                     <div class="slider-group">
-                        <label>Scale Z: <span class="slider-value" id="faceScaleZValue">1.00</span></label>
+                        <label>Z: <span class="slider-value" id="faceScaleZValue">1.00</span></label>
                         <input type="range" id="faceScaleZSlider" min="0.5" max="2.0" step="0.05" value="1.00">
                     </div>
 
+                    <div class="control-group-label">Position</div>
                     <div class="slider-group">
-                        <label>Position X: <span class="slider-value" id="facePosXValue">0.00</span></label>
+                        <label>X: <span class="slider-value" id="facePosXValue">0.00</span></label>
                         <input type="range" id="facePosXSlider" min="-2" max="2" step="0.01" value="0">
                     </div>
-
                     <div class="slider-group">
-                        <label>Position Y: <span class="slider-value" id="facePosYValue">0.00</span></label>
+                        <label>Y: <span class="slider-value" id="facePosYValue">0.00</span></label>
                         <input type="range" id="facePosYSlider" min="-2" max="2" step="0.01" value="0">
                     </div>
-
                     <div class="slider-group">
-                        <label>Position Z: <span class="slider-value" id="facePosZValue">0.00</span></label>
+                        <label>Z: <span class="slider-value" id="facePosZValue">0.00</span></label>
                         <input type="range" id="facePosZSlider" min="-2" max="2" step="0.01" value="0">
+                    </div>
+
+                    <div class="control-group-label">Rotation (degrees)</div>
+                    <div class="slider-group">
+                        <label>X (Pitch): <span class="slider-value" id="faceRotXValue">0°</span></label>
+                        <input type="range" id="faceRotXSlider" min="-180" max="180" step="1" value="0">
+                    </div>
+                    <div class="slider-group">
+                        <label>Y (Yaw): <span class="slider-value" id="faceRotYValue">0°</span></label>
+                        <input type="range" id="faceRotYSlider" min="-180" max="180" step="1" value="0">
+                    </div>
+                    <div class="slider-group">
+                        <label>Z (Roll): <span class="slider-value" id="faceRotZValue">0°</span></label>
+                        <input type="range" id="faceRotZSlider" min="-180" max="180" step="1" value="0">
                     </div>
                 </div>
 
