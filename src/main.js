@@ -260,15 +260,14 @@ class FaceToBlendshape3D {
                 console.log('Head Raw Dims:', headWidth, headHeight, headCenter);
                 
                 // 3. Calculate Scale Factors
-                // Target width: 1.5x face width
-                // Safeguard against zero width
+                // Reduce multipliers for tighter fit (was 1.5/1.8)
                 const safeFaceWidth = faceWidth || 2.0;
                 const safeHeadWidth = headWidth || 2.0;
                 const safeFaceHeight = faceHeight || 2.0;
                 const safeHeadHeight = headHeight || 2.0;
 
-                const targetHeadWidth = safeFaceWidth * 1.5; 
-                const targetHeadHeight = safeFaceHeight * 1.8;
+                const targetHeadWidth = safeFaceWidth * 1.35; 
+                const targetHeadHeight = safeFaceHeight * 1.6;
                 
                 const scaleX = targetHeadWidth / safeHeadWidth;
                 const scaleY = targetHeadHeight / safeHeadHeight;
@@ -279,28 +278,34 @@ class FaceToBlendshape3D {
                 this.headModel.scale.set(scaleX, scaleY, uniformScale);
                 this.headModel.updateMatrixWorld(true);
                 
-                // 4. Apply Skin Color
+                // 4. Apply Skin Color with NEW Material
                 const skinColor = this.faceMesh.userData.skinColor;
                 console.log('Applying Skin Color:', skinColor);
                 
                 if (skinColor) {
                     this.headModel.traverse((child) => {
                         if (child.isMesh) {
-                            // Clone material to avoid sharing if multiple objects
-                            child.material = child.material.clone();
+                            // Create NEW material to reset any GLB weirdness
+                            const oldMat = child.material;
                             
                             // Ensure color is bright enough (simple tone mapping)
                             const r = Math.max(skinColor.r, 0.5);
                             const g = Math.max(skinColor.g, 0.4);
                             const b = Math.max(skinColor.b, 0.3);
                             
-                            child.material.color.setRGB(r, g, b);
-                            child.material.map = null; // Remove existing texture
-                            child.material.roughness = 0.8; // Skin-like roughness
-                            child.material.metalness = 0.0;
-                            child.material.needsUpdate = true;
-                            // Ensure double sided or front sided visibility
-                            child.material.side = THREE.DoubleSide; 
+                            const newMat = new THREE.MeshStandardMaterial({
+                                color: new THREE.Color(r, g, b),
+                                roughness: 0.5,
+                                metalness: 0.0,
+                                side: THREE.DoubleSide
+                            });
+                            
+                            // Copy skinning if it was a SkinnedMesh (likely not for head.glb but safe)
+                            if (child.isSkinnedMesh) {
+                                newMat.skinning = true;
+                            }
+                            
+                            child.material = newMat;
                         }
                     });
                 }
@@ -317,18 +322,15 @@ class FaceToBlendshape3D {
                 
                 // Align Z:
                 // Move head center to face center
-                // THEN push BACK by roughly half the head depth + a bit more
-                // Because Head Center is in the middle of the skull, and Face Center is on the surface.
-                // We want the front surface of head to match back surface of face.
+                // THEN push BACK. Since face is now DEEPER, we push back slightly MORE/LESS?
+                // If face is deeper, it occupies more space backwards.
+                // We want head front to meet face back.
                 
                 // Center alignment first:
                 let targetZ = faceCenter.z - scaledHeadCenter.z;
                 
-                // Now push back. Head center is at 0 (relative). Front is at +Depth/2.
-                // We want Front (+Depth/2) to be at Face Z.
-                // So move center back by Depth/2.
-                // Adjusted from 0.4 to 0.35 to account for rounder face mesh
-                const pushBack = scaledHeadDepth * 0.35; 
+                // Push back ~45% of head depth to align front of head with back of face
+                const pushBack = scaledHeadDepth * 0.45; 
                 
                 const offsetZ = targetZ - pushBack;
                 
